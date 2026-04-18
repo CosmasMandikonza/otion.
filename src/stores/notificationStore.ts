@@ -43,7 +43,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       unreadCount: state.unreadCount + 1,
     }));
 
-    // Auto-dismiss active notification after 3 seconds
+    const visibleDurationMs = type === 'error' ? 6000 : 3000;
+
+    // Auto-dismiss active notification after a short visible period
     setTimeout(() => {
       const current = get().activeNotification;
       if (current?.id === notification.id) {
@@ -59,7 +61,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           }));
         }, 500);
       }
-    }, 3000);
+    }, visibleDurationMs);
   },
 
   dismissNotification: (id) => {
