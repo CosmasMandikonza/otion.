@@ -27,10 +27,10 @@ const steps = [
   },
   {
     title: "Create Frames",
-    description: "Click anywhere on the canvas to add a new frame. Double-click a frame to enter sketch mode and start drawing.",
+    description: "Use the Add Frame control to place a new frame on the canvas. Double-click a frame to enter sketch mode and start drawing.",
     icon: Pencil,
     color: "from-sm-pink to-sm-coral",
-    shortcut: "Click canvas",
+    shortcut: "Ctrl+N",
   },
   {
     title: "Connect Your Sequence",
@@ -83,13 +83,14 @@ export function OnboardingOverlay({ isOpen, onClose }: OnboardingOverlayProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="pointer-events-auto"
           >
             <GlassCard className="w-full max-w-lg p-8 relative">
               {/* Close Button */}

@@ -145,6 +145,15 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
+function hasCustomStoryboardTitle(title?: string): boolean {
+  if (!title) {
+    return false;
+  }
+
+  const trimmed = title.trim();
+  return trimmed.length > 0 && !/^Frame \d+$/i.test(trimmed);
+}
+
 function formatNarrativeMode(value: string): string {
   return value
     .split("-")
@@ -391,6 +400,39 @@ export function GLMStoryboardWorkflow({
 
   const isResultStale = !!result && lastRunSignature !== frameSignature;
   const isRevisionRun = !!result && revisionInput.trim().length > 0;
+  const hasSufficientStoryboardInput = useMemo(() => {
+    if (scopedFrames.length === 0) {
+      return false;
+    }
+
+    const meaningfulFrameCount = scopedFrames.filter((frame) => {
+      const hasMotionNotes = !!frame.motionNotes?.trim();
+      const hasCustomDuration =
+        typeof frame.durationMs === "number" && frame.durationMs > 500;
+
+      return (
+        hasCustomStoryboardTitle(frame.title) ||
+        hasMotionNotes ||
+        hasCustomDuration ||
+        frame.status === "polished"
+      );
+    }).length;
+
+    if (meaningfulFrameCount > 0) {
+      return true;
+    }
+
+    return scopedFrames.length === 1;
+  }, [scopedFrames]);
+  const insufficientInputMessage = useMemo(() => {
+    if (hasSufficientStoryboardInput) {
+      return null;
+    }
+
+    return scopedFrames.length === 0
+      ? null
+      : "Add at least one storyboard frame, or clear a stale selection, to build a live plan.";
+  }, [hasSufficientStoryboardInput, scopedFrames.length]);
   const directorControlSummary = useMemo(
     () => getDirectorControlSummary(directorControls),
     [directorControls],
@@ -398,6 +440,7 @@ export function GLMStoryboardWorkflow({
   const canRun =
     isZAIEnabled &&
     scopedFrames.length > 0 &&
+    hasSufficientStoryboardInput &&
     !isRunning;
   const displayWarnings = useMemo(
     () => uniqueStrings([...(result?.warnings || []), ...preflightWarnings]),
@@ -598,7 +641,7 @@ export function GLMStoryboardWorkflow({
   }
 
   return (
-    <div className="p-4 border-b border-white/10">
+    <div className="p-4 border-b border-white/10" data-testid="glm-storyboard-workflow">
       <div className="flex items-center gap-2 mb-3">
         <Sparkles className="w-4 h-4 text-cyan-300" />
         <span className="text-xs font-medium text-white/70">
@@ -687,6 +730,7 @@ export function GLMStoryboardWorkflow({
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               className="space-y-2"
+              data-testid="glm-plan-progress"
             >
               <div className="flex justify-between text-[10px]">
                 <span className="text-white/50">
@@ -767,7 +811,10 @@ export function GLMStoryboardWorkflow({
         )}
 
         {isZAIEnabled && scopedFrames.length === 0 && (
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div
+            className="rounded-xl border border-white/10 bg-white/5 p-3"
+            data-testid="glm-insufficient-input-warning"
+          >
             <p className="text-[10px] text-white/65 leading-relaxed">
               Add storyboard frames to this board, or clear a stale selection, to
               build a live plan.
@@ -775,8 +822,27 @@ export function GLMStoryboardWorkflow({
           </div>
         )}
 
+        {isZAIEnabled && scopedFrames.length > 0 && !hasSufficientStoryboardInput && (
+          <div
+            className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3"
+            data-testid="glm-insufficient-input-warning"
+          >
+            <p className="text-[10px] text-amber-200 leading-relaxed">
+              Add storyboard frames to this board, or clear a stale selection, to build a live plan.
+            </p>
+            {insufficientInputMessage && (
+              <p className="text-[10px] text-amber-200/80 leading-relaxed mt-2">
+                {insufficientInputMessage}
+              </p>
+            )}
+          </div>
+        )}
+
         {runError && (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+          <div
+            className="rounded-xl border border-red-500/20 bg-red-500/10 p-3"
+            data-testid="glm-plan-error"
+          >
             <p className="text-[10px] text-red-300 leading-relaxed">{runError}</p>
           </div>
         )}
@@ -798,7 +864,10 @@ export function GLMStoryboardWorkflow({
               exit={{ opacity: 0, height: 0 }}
               className="space-y-3"
             >
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div
+                className="rounded-xl border border-white/10 bg-white/5 p-3"
+                data-testid="glm-plan-result"
+              >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -1070,6 +1139,7 @@ export function GLMStoryboardWorkflow({
             </span>
           </div>
           <Textarea
+            data-testid="glm-revision-input"
             value={revisionInput}
             onChange={(event) => setRevisionInput(event.target.value)}
             placeholder={
@@ -1084,7 +1154,7 @@ export function GLMStoryboardWorkflow({
             <div className="text-[9px] text-white/35 leading-relaxed">
               {!isZAIEnabled
                 ? "Enable the planning provider and restart the app to use Live Plan here."
-                : scopedFrames.length === 0
+                : scopedFrames.length === 0 || !hasSufficientStoryboardInput
                   ? "Add at least one storyboard frame, or clear a stale selection, to build a live plan."
                   : result
                 ? "The next run will preserve the current plan where possible and revise only the requested parts."
@@ -1092,8 +1162,10 @@ export function GLMStoryboardWorkflow({
             </div>
 
             <button
+              type="button"
               onClick={handleRunWorkflow}
               disabled={!canRun}
+              data-testid="glm-run-plan-button"
               className={cn(
                 "w-full px-3 py-2 rounded-xl text-[11px] font-medium transition-all flex items-center justify-center gap-2",
                 canRun

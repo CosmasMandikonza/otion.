@@ -30,58 +30,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { polishSketch, polishSketchWithStyle } from "@/lib/googleAI";
+import { useNotification } from "@/hooks/useNotification";
+import { polishSketchWithStyle } from "@/lib/googleAI";
+import { POLISH_STYLES, type PolishStyle } from "@/lib/polishStyles";
 
 type AnimationStyle = "static" | "zoom-in" | "zoom-out" | "pan-left" | "pan-right" | "parallax";
-
-// Polish style options - shown BEFORE polishing
-type PolishStyle = "illustration" | "anime" | "realistic" | "watercolor" | "3d-render" | "comic";
-
-interface PolishStyleOption {
-  id: PolishStyle;
-  label: string;
-  description: string;
-  prompt: string;
-}
-
-const POLISH_STYLES: PolishStyleOption[] = [
-  {
-    id: "illustration",
-    label: "Digital Illustration",
-    description: "Clean, professional storyboard style",
-    prompt: "polished digital illustration, clean lines, professional storyboard frame, vibrant colors"
-  },
-  {
-    id: "anime",
-    label: "Anime",
-    description: "Japanese animation style",
-    prompt: "anime style, cel shading, vibrant colors, detailed anime illustration"
-  },
-  {
-    id: "realistic",
-    label: "Realistic",
-    description: "Photorealistic rendering",
-    prompt: "photorealistic, cinematic lighting, detailed textures, high quality render"
-  },
-  {
-    id: "watercolor",
-    label: "Watercolor",
-    description: "Soft, artistic watercolor painting",
-    prompt: "watercolor painting, soft edges, artistic, flowing colors, paper texture"
-  },
-  {
-    id: "3d-render",
-    label: "3D Render",
-    description: "Modern 3D visualization",
-    prompt: "3D render, Pixar style, smooth surfaces, global illumination, professional 3D"
-  },
-  {
-    id: "comic",
-    label: "Comic Book",
-    description: "Bold comic book art style",
-    prompt: "comic book style, bold outlines, dynamic shading, halftone dots, graphic novel art"
-  }
-];
 
 // Editor stage type
 type EditorStage = "drawing" | "style-select" | "polishing" | "preview";
@@ -93,10 +46,18 @@ interface FrameSketchEditorProps {
     sketchDataUrl?: string;
     motionNotes?: string;
     animationStyle?: AnimationStyle;
+    polishStyle?: PolishStyle;
   } | null;
   open: boolean;
   onClose: () => void;
-  onSave: (dataUrl: string, shouldPolish?: boolean, motionNotes?: string, animationStyle?: AnimationStyle, originalSketchData?: string) => void;
+  onSave: (
+    dataUrl: string,
+    shouldPolish?: boolean,
+    motionNotes?: string,
+    animationStyle?: AnimationStyle,
+    originalSketchData?: string,
+    polishStyle?: PolishStyle,
+  ) => void;
 }
 
 // Expanded color palette
@@ -134,6 +95,7 @@ export function FrameSketchEditor({
   onClose,
   onSave,
 }: FrameSketchEditorProps) {
+  const { error: notifyError } = useNotification();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -159,6 +121,7 @@ export function FrameSketchEditor({
     if (frame) {
       setMotionNotes(frame.motionNotes || "");
       setAnimationStyle(frame.animationStyle || "static");
+      setSelectedStyle(frame.polishStyle || "illustration");
     }
   }, [frame]);
 
@@ -747,15 +710,26 @@ export function FrameSketchEditor({
         setPolishedImageData(result);
         setStage("preview");
       } else {
-        setPolishError("AI couldn't generate an image. Try a different style or add more detail to your sketch.");
+        const message =
+          "Polish failed. We couldn't complete the AI polish right now. Try a different style or add more detail to your sketch.";
+        setPolishError(message);
+        notifyError(message);
         setStage("drawing");
       }
     } catch (error) {
       console.error("Polish error:", error);
-      setPolishError(error instanceof Error ? error.message : "Failed to polish. Please try again.");
+      const rawMessage =
+        error instanceof Error && error.message.trim()
+          ? error.message.trim()
+          : "We couldn't complete the AI polish right now.";
+      const message = /polish/i.test(rawMessage)
+        ? rawMessage
+        : `Polish failed. ${rawMessage}`;
+      setPolishError(message);
+      notifyError(message);
       setStage("drawing");
     }
-  }, [originalSketchData, selectedStyle]);
+  }, [notifyError, originalSketchData, selectedStyle]);
 
   // Back to Drawing - RESTORE Canvas from saved data
   const handleBackToDrawing = useCallback(() => {
@@ -833,10 +807,17 @@ export function FrameSketchEditor({
   const handleSavePolished = useCallback(() => {
     if (polishedImageData && originalSketchData) {
       // Pass both polished image and original sketch data
-      onSave(polishedImageData, true, motionNotes, animationStyle, originalSketchData);
+      onSave(
+        polishedImageData,
+        true,
+        motionNotes,
+        animationStyle,
+        originalSketchData,
+        selectedStyle,
+      );
     }
     handleClose();
-  }, [polishedImageData, originalSketchData, onSave, motionNotes, animationStyle]);
+  }, [polishedImageData, originalSketchData, onSave, motionNotes, animationStyle, selectedStyle]);
 
   // Handle Close Properly
   const handleClose = useCallback(() => {

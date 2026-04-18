@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, Copy, Check, Link2, X, Trash2, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,38 @@ interface CollaboratorAvatarsProps {
   maxVisible?: number;
 }
 
+type PublicAccessLevel = 'none' | 'view' | 'comment' | 'edit';
+
+function copyTextWithExecCommand(text: string) {
+  const textarea = document.createElement('textarea');
+  const activeElement = document.activeElement as HTMLElement | null;
+
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.setAttribute('aria-hidden', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.top = '0';
+  textarea.style.left = '0';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, text.length);
+
+  let copied = false;
+
+  try {
+    copied = document.execCommand('copy');
+  } finally {
+    document.body.removeChild(textarea);
+    activeElement?.focus?.();
+  }
+
+  return copied;
+}
+
 export function CollaboratorAvatars({
   boardId,
   maxVisible = 3,
@@ -31,6 +63,9 @@ export function CollaboratorAvatars({
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const [updatingAccess, setUpdatingAccess] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [publicAccessValue, setPublicAccessValue] = useState<PublicAccessLevel>('none');
 
   const {
     collaborators,
@@ -49,10 +84,37 @@ export function CollaboratorAvatars({
   const visibleUsers = onlineUsers.slice(0, maxVisible);
   const overflowCount = Math.max(0, onlineUsers.length - maxVisible);
 
+  useEffect(() => {
+    setPublicAccessValue(sharingSettings.public_access);
+  }, [sharingSettings.public_access]);
+
   const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopyError(null);
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else if (!copyTextWithExecCommand(shareUrl)) {
+        throw new Error('Clipboard API unavailable');
+      }
+
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+      return;
+    } catch (clipboardError) {
+      try {
+        if (!copyTextWithExecCommand(shareUrl)) {
+          throw clipboardError;
+        }
+
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+        return;
+      } catch {
+        setCopied(false);
+        setCopyError("Couldn't copy the share link automatically. You can still select and copy it manually.");
+      }
+    }
   };
 
   const handleInvite = async () => {
@@ -78,11 +140,16 @@ export function CollaboratorAvatars({
     await removeCollaborator(id);
   };
 
-  const handleUpdatePublicAccess = async (newAccess: 'none' | 'view' | 'edit') => {
+  const handleUpdatePublicAccess = async (newAccess: PublicAccessLevel) => {
+    const previousAccess = publicAccessValue;
+    setAccessError(null);
+    setPublicAccessValue(newAccess);
     setUpdatingAccess(true);
     const result = await updateSharingSettings({ public_access: newAccess });
     if (result.error) {
       console.error('Failed to update:', result.error);
+      setPublicAccessValue(previousAccess);
+      setAccessError("Couldn't update public access right now. Your previous setting is still active.");
     }
     setUpdatingAccess(false);
   };
@@ -158,9 +225,12 @@ export function CollaboratorAvatars({
 
       {/* Share button */}
       <motion.button
+        type="button"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setShowShareModal(true)}
+        data-testid="share-open-button"
+        aria-label="Open share board dialog"
         className={cn(
           "ml-2 w-8 h-8 rounded-full flex items-center justify-center transition-all",
           "bg-gradient-to-br from-pink-500/20 to-purple-500/20",
@@ -201,6 +271,7 @@ export function CollaboratorAvatars({
                   <p className="text-xs text-white/50 mt-1">Invite others to collaborate</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowShareModal(false)}
                   className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
@@ -222,14 +293,19 @@ export function CollaboratorAvatars({
                         type="text"
                         readOnly
                         value={shareUrl}
+                        data-testid="share-link-input"
+                        aria-label="Share link"
                         className="flex-1 text-xs text-white/70 bg-transparent outline-none truncate"
                         onClick={(e) => (e.target as HTMLInputElement).select()}
                       />
                     </div>
                     <button
+                      type="button"
+                      data-testid="share-copy-link-button"
+                      aria-label="Copy share link"
                       onClick={handleCopyLink}
                       className={cn(
-                        "px-3 py-2.5 rounded-xl flex items-center gap-2 transition-all font-medium text-xs",
+                        "relative z-10 shrink-0 px-3 py-2.5 rounded-xl flex items-center gap-2 transition-all font-medium text-xs",
                         copied
                           ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400"
                           : "bg-pink-500/20 border border-pink-500/30 text-pink-400 hover:bg-pink-500/30"
@@ -248,6 +324,11 @@ export function CollaboratorAvatars({
                       )}
                     </button>
                   </div>
+                  {copyError && (
+                    <p className="mt-1.5 text-xs text-amber-300" role="alert">
+                      {copyError}
+                    </p>
+                  )}
                 </div>
 
                 {/* Invite by email - only for owner */}
@@ -306,14 +387,16 @@ export function CollaboratorAvatars({
                         "flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-black/30 border transition-colors",
                         updatingAccess ? "border-pink-500/30" : "border-white/[0.08]"
                       )}>
-                        {sharingSettings.public_access === 'none' ? (
+                        {publicAccessValue === 'none' ? (
                           <Lock className="w-4 h-4 text-white/40" />
                         ) : (
                           <Globe className="w-4 h-4 text-emerald-400" />
                         )}
                         <select
-                          value={sharingSettings.public_access}
-                          onChange={(e) => handleUpdatePublicAccess(e.target.value as 'none' | 'view' | 'edit')}
+                          data-testid="share-public-access-select"
+                          aria-label="Public access level"
+                          value={publicAccessValue}
+                          onChange={(e) => handleUpdatePublicAccess(e.target.value as PublicAccessLevel)}
                           disabled={updatingAccess}
                           className="flex-1 text-sm text-white/70 bg-[#1a1a2e] outline-none cursor-pointer disabled:opacity-50 [&>option]:bg-[#1a1a2e] [&>option]:text-white/70"
                         >
@@ -327,7 +410,7 @@ export function CollaboratorAvatars({
                       </div>
                     </div>
                     <p className="text-[10px] text-white/40 mt-1.5 flex items-center gap-1">
-                      {sharingSettings.public_access === 'none' ? (
+                      {publicAccessValue === 'none' ? (
                         <>
                           <Lock className="w-3 h-3" />
                           Board is private - only you and invited collaborators can access
@@ -339,6 +422,11 @@ export function CollaboratorAvatars({
                         </>
                       )}
                     </p>
+                    {accessError && (
+                      <p className="text-xs text-amber-300 mt-1.5" role="alert">
+                        {accessError}
+                      </p>
+                    )}
                   </div>
                 )}
 

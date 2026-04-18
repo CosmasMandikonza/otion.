@@ -36,6 +36,7 @@ interface CanvasToolbarProps {
   isMotionSuggesting?: boolean;
   isContinuityChecking?: boolean;
   polishedFrameCount?: number;
+  readOnly?: boolean;
 }
 
 export function CanvasToolbar({
@@ -56,6 +57,7 @@ export function CanvasToolbar({
   isMotionSuggesting = false,
   isContinuityChecking = false,
   polishedFrameCount = 0,
+  readOnly = false,
 }: CanvasToolbarProps) {
   return (
     <TooltipProvider delayDuration={200}>
@@ -66,6 +68,8 @@ export function CanvasToolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
+                data-testid="toolbar-select-tool"
                 onClick={() => onToolChange("select")}
                 className={cn(
                   "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
@@ -84,6 +88,8 @@ export function CanvasToolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
+                data-testid="toolbar-pan-tool"
                 onClick={() => onToolChange("pan")}
                 className={cn(
                   "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
@@ -102,10 +108,16 @@ export function CanvasToolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => onToolChange("connector")}
+                type="button"
+                data-testid="toolbar-connector-tool"
+                aria-disabled={readOnly || undefined}
+                disabled={readOnly}
+                onClick={() => !readOnly && onToolChange("connector")}
                 className={cn(
                   "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                  activeTool === "connector"
+                  readOnly
+                    ? "text-white/20 cursor-not-allowed"
+                    : activeTool === "connector"
                     ? "bg-gradient-to-br from-pink-500 to-rose-500 text-white"
                     : "text-white/60 hover:bg-white/10 hover:text-white"
                 )}
@@ -123,8 +135,17 @@ export function CanvasToolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={onAddFrame}
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                type="button"
+                data-testid="toolbar-add-frame"
+                aria-disabled={readOnly || undefined}
+                disabled={readOnly}
+                onClick={() => !readOnly && onAddFrame?.()}
+                className={cn(
+                  "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                  readOnly
+                    ? "text-white/20 cursor-not-allowed"
+                    : "text-white/60 hover:bg-white/10 hover:text-white",
+                )}
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -155,11 +176,13 @@ export function CanvasToolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={onBatchPolish}
-                disabled={frameCount < 1}
+                type="button"
+                data-testid="toolbar-batch-polish"
+                onClick={() => !readOnly && onBatchPolish?.()}
+                disabled={readOnly || frameCount < 1}
                 className={cn(
                   "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                  frameCount < 1
+                  readOnly || frameCount < 1
                     ? "text-white/25 cursor-not-allowed"
                     : "text-white/60 hover:bg-white/10 hover:text-white"
                 )}

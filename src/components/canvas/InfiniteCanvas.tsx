@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FrameCard } from "./FrameCard";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ interface InfiniteCanvasProps {
   onFrameSelect: (id: string, multiSelect?: boolean) => void;
   onFrameDelete: (id: string) => void;
   onFrameDuplicate: (id: string) => void;
-  onCanvasClick: (position: { x: number; y: number }) => void;
+  onCanvasBackgroundClick: () => void;
   onFrameDoubleClick?: (id: string) => void;
   onConnectionDelete?: (id: string) => void;
   onFramePositionChange: (id: string, delta: { dx: number; dy: number }) => void;
@@ -47,19 +47,27 @@ interface InfiniteCanvasProps {
   connectingFromFrameId?: string | null;
   beatModeEnabled?: boolean;
   onFrameDurationChange?: (id: string, durationMs: number) => void;
+  readOnly?: boolean;
 }
 
 const FRAME_WIDTH = 192;
 const FRAME_HEIGHT = 144;
 
-function getSmartConnectionPath(from: Frame, to: Frame) {
+type ConnectionBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+function getSmartConnectionGeometry(from: ConnectionBox, to: ConnectionBox) {
   const fromCenter = {
-    x: from.position.x + FRAME_WIDTH / 2,
-    y: from.position.y + FRAME_HEIGHT / 2,
+    x: from.x + from.width / 2,
+    y: from.y + from.height / 2,
   };
   const toCenter = {
-    x: to.position.x + FRAME_WIDTH / 2,
-    y: to.position.y + FRAME_HEIGHT / 2,
+    x: to.x + to.width / 2,
+    y: to.y + to.height / 2,
   };
 
   const dx = toCenter.x - fromCenter.x;
@@ -70,18 +78,18 @@ function getSmartConnectionPath(from: Frame, to: Frame) {
 
   if (Math.abs(dx) > Math.abs(dy)) {
     if (dx > 0) {
-      fromPoint = { x: from.position.x + FRAME_WIDTH, y: fromCenter.y };
-      toPoint = { x: to.position.x, y: toCenter.y };
+      fromPoint = { x: from.x + from.width, y: fromCenter.y };
+      toPoint = { x: to.x, y: toCenter.y };
     } else {
-      fromPoint = { x: from.position.x, y: fromCenter.y };
-      toPoint = { x: to.position.x + FRAME_WIDTH, y: toCenter.y };
+      fromPoint = { x: from.x, y: fromCenter.y };
+      toPoint = { x: to.x + to.width, y: toCenter.y };
     }
   } else if (dy > 0) {
-    fromPoint = { x: fromCenter.x, y: from.position.y + FRAME_HEIGHT };
-    toPoint = { x: toCenter.x, y: to.position.y };
+    fromPoint = { x: fromCenter.x, y: from.y + from.height };
+    toPoint = { x: toCenter.x, y: to.y };
   } else {
-    fromPoint = { x: fromCenter.x, y: from.position.y };
-    toPoint = { x: toCenter.x, y: to.position.y + FRAME_HEIGHT };
+    fromPoint = { x: fromCenter.x, y: from.y };
+    toPoint = { x: toCenter.x, y: to.y + to.height };
   }
 
   const distance = Math.sqrt(dx * dx + dy * dy);
@@ -104,6 +112,28 @@ function getSmartConnectionPath(from: Frame, to: Frame) {
       y: (fromPoint.y + toPoint.y) / 2,
     },
   };
+}
+
+function getFrameBox(frame: Frame): ConnectionBox {
+  return {
+    x: frame.position.x,
+    y: frame.position.y,
+    width: FRAME_WIDTH,
+    height: FRAME_HEIGHT,
+  };
+}
+
+function getSmartConnectionPath(from: Frame, to: Frame) {
+  return getSmartConnectionGeometry(getFrameBox(from), getFrameBox(to));
+}
+
+function getPreviewConnectionPath(from: Frame, toPoint: { x: number; y: number }) {
+  return getSmartConnectionGeometry(getFrameBox(from), {
+    x: toPoint.x,
+    y: toPoint.y,
+    width: 0,
+    height: 0,
+  });
 }
 
 function calculateSequenceNumbers(connections: Connection[]) {
@@ -165,7 +195,7 @@ export function InfiniteCanvas({
   onFrameSelect,
   onFrameDelete,
   onFrameDuplicate,
-  onCanvasClick,
+  onCanvasBackgroundClick,
   onFrameDoubleClick,
   onConnectionDelete,
   onFramePositionChange,
@@ -176,12 +206,20 @@ export function InfiniteCanvas({
   connectingFromFrameId,
   beatModeEnabled = false,
   onFrameDurationChange,
+  readOnly = false,
 }: InfiniteCanvasProps) {
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
+  const [hoveredConnectFrameId, setHoveredConnectFrameId] = useState<string | null>(null);
+  const [connectPreviewPoint, setConnectPreviewPoint] = useState<{ x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+
+  const canDragFrames = activeTool === "select" && !readOnly;
+  const canDeleteConnections = !readOnly && activeTool === "select" && !!onConnectionDelete;
+  const isConnectMode = activeTool === "connector" && !readOnly;
 
   const frameById = useMemo(() => {
     const map = new Map<string, Frame>();
@@ -189,7 +227,61 @@ export function InfiniteCanvas({
     return map;
   }, [frames]);
 
+  const connectionPairSet = useMemo(() => {
+    const pairs = new Set<string>();
+    connections.forEach((connection) => {
+      pairs.add(`${connection.from}:${connection.to}`);
+      pairs.add(`${connection.to}:${connection.from}`);
+    });
+    return pairs;
+  }, [connections]);
+
   const selectedFrameSet = useMemo(() => new Set(selectedFrames), [selectedFrames]);
+
+  const sourceFrame = connectingFromFrameId ? frameById.get(connectingFromFrameId) || null : null;
+
+  const hoveredConnectState = useMemo(() => {
+    if (!sourceFrame || !hoveredConnectFrameId) return "idle";
+    if (hoveredConnectFrameId === sourceFrame.id) return "invalid";
+    if (connectionPairSet.has(`${sourceFrame.id}:${hoveredConnectFrameId}`)) return "invalid";
+    return "valid";
+  }, [connectionPairSet, hoveredConnectFrameId, sourceFrame]);
+
+  const previewConnection = useMemo(() => {
+    if (!isConnectMode || !sourceFrame) return null;
+
+    if (hoveredConnectFrameId) {
+      const hoveredFrame = frameById.get(hoveredConnectFrameId);
+      if (!hoveredFrame) return null;
+      return {
+        ...getSmartConnectionPath(sourceFrame, hoveredFrame),
+        state: hoveredConnectState,
+      };
+    }
+
+    if (connectPreviewPoint) {
+      return {
+        ...getPreviewConnectionPath(sourceFrame, connectPreviewPoint),
+        state: "preview",
+      };
+    }
+
+    return null;
+  }, [
+    connectPreviewPoint,
+    frameById,
+    hoveredConnectFrameId,
+    hoveredConnectState,
+    isConnectMode,
+    sourceFrame,
+  ]);
+
+  useEffect(() => {
+    if (!isConnectMode || !sourceFrame) {
+      setHoveredConnectFrameId(null);
+      setConnectPreviewPoint(null);
+    }
+  }, [isConnectMode, sourceFrame]);
 
   const sequenceMap = useMemo(() => calculateSequenceNumbers(connections), [connections]);
 
@@ -229,9 +321,18 @@ export function InfiniteCanvas({
     (e: React.MouseEvent) => {
       if (isPanning) {
         setPan({ x: e.clientX - startPan.x, y: e.clientY - startPan.y });
+        return;
+      }
+
+      if (isConnectMode && sourceFrame && canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        setConnectPreviewPoint({
+          x: (e.clientX - rect.left - pan.x) / zoom,
+          y: (e.clientY - rect.top - pan.y) / zoom,
+        });
       }
     },
-    [isPanning, startPan]
+    [isConnectMode, isPanning, pan.x, pan.y, sourceFrame, startPan, zoom]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -240,22 +341,26 @@ export function InfiniteCanvas({
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === canvasRef.current && activeTool === "select") {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left - pan.x) / zoom;
-        const y = (e.clientY - rect.top - pan.y) / zoom;
-        onCanvasClick({ x, y });
+      if (e.target === canvasRef.current || e.target === contentRef.current) {
+        onCanvasBackgroundClick();
       }
     },
-    [activeTool, onCanvasClick, pan, zoom]
+    [onCanvasBackgroundClick]
   );
 
   return (
     <div
       ref={canvasRef}
+      data-testid="canvas-surface"
       className={cn(
         "absolute inset-0 overflow-hidden canvas-grid",
-        isPanning ? "cursor-grabbing" : activeTool === "pan" ? "cursor-grab" : "cursor-default"
+        isPanning
+          ? "cursor-grabbing"
+          : activeTool === "pan"
+          ? "cursor-grab"
+          : isConnectMode
+          ? "cursor-crosshair"
+          : "cursor-default"
       )}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -264,6 +369,7 @@ export function InfiniteCanvas({
       onClick={handleCanvasClick}
     >
       <motion.div
+        ref={contentRef}
         className="absolute"
         style={{
           x: pan.x,
@@ -294,16 +400,20 @@ export function InfiniteCanvas({
             const labelY = connection.midpoint.y - 18;
 
             return (
-              <g key={connection.id}>
+              <g key={connection.id} data-testid={`canvas-connection-${connection.id}`}>
                 <path
                   d={connection.path}
                   stroke="transparent"
                   strokeWidth="24"
                   fill="none"
-                  style={{ pointerEvents: "stroke", cursor: "pointer" }}
-                  onMouseEnter={() => setHoveredConnection(connection.id)}
-                  onMouseLeave={() => setHoveredConnection(null)}
+                  style={{
+                    pointerEvents: canDeleteConnections ? "stroke" : "none",
+                    cursor: canDeleteConnections ? "pointer" : "default",
+                  }}
+                  onMouseEnter={() => canDeleteConnections && setHoveredConnection(connection.id)}
+                  onMouseLeave={() => canDeleteConnections && setHoveredConnection(null)}
                   onClick={(e) => {
+                    if (!canDeleteConnections) return;
                     e.stopPropagation();
                     onConnectionDelete?.(connection.id);
                   }}
@@ -335,10 +445,14 @@ export function InfiniteCanvas({
 
                 <g
                   transform={`translate(${labelX}, ${labelY})`}
-                  style={{ pointerEvents: "auto", cursor: "pointer" }}
-                  onMouseEnter={() => setHoveredConnection(connection.id)}
-                  onMouseLeave={() => setHoveredConnection(null)}
+                  style={{
+                    pointerEvents: canDeleteConnections ? "auto" : "none",
+                    cursor: canDeleteConnections ? "pointer" : "default",
+                  }}
+                  onMouseEnter={() => canDeleteConnections && setHoveredConnection(connection.id)}
+                  onMouseLeave={() => canDeleteConnections && setHoveredConnection(null)}
                   onClick={(e) => {
+                    if (!canDeleteConnections) return;
                     e.stopPropagation();
                     onConnectionDelete?.(connection.id);
                   }}
@@ -367,6 +481,37 @@ export function InfiniteCanvas({
               </g>
             );
           })}
+
+          {previewConnection && (
+            <g data-testid="canvas-connection-preview">
+              <path
+                d={previewConnection.path}
+                stroke={
+                  previewConnection.state === "invalid"
+                    ? "rgba(251, 113, 133, 0.75)"
+                    : "rgba(34, 211, 238, 0.55)"
+                }
+                strokeWidth={4}
+                strokeDasharray="10 8"
+                fill="none"
+                strokeLinecap="round"
+                style={{ pointerEvents: "none" }}
+              />
+              <path
+                d={previewConnection.path}
+                stroke={
+                  previewConnection.state === "invalid"
+                    ? "rgba(251, 113, 133, 0.95)"
+                    : "rgba(255, 255, 255, 0.85)"
+                }
+                strokeWidth={2}
+                strokeDasharray="10 8"
+                fill="none"
+                strokeLinecap="round"
+                style={{ pointerEvents: "none" }}
+              />
+            </g>
+          )}
         </svg>
 
         {frames.map((frame, index) => (
@@ -381,8 +526,16 @@ export function InfiniteCanvas({
             isConnecting={connectingFromFrameId === frame.id}
             isPolished={frame.isPolished}
             isPolishing={frame.isPolishing}
-            onClick={() => onFrameSelect(frame.id)}
-            onDoubleClick={() => onFrameDoubleClick?.(frame.id)}
+            onClick={activeTool === "pan" ? () => undefined : () => onFrameSelect(frame.id)}
+            onDoubleClick={activeTool === "select" ? () => onFrameDoubleClick?.(frame.id) : undefined}
+            onConnectHoverStart={() => {
+              if (!isConnectMode || !sourceFrame) return;
+              setHoveredConnectFrameId(frame.id);
+            }}
+            onConnectHoverEnd={() => {
+              if (!isConnectMode) return;
+              setHoveredConnectFrameId((prev) => (prev === frame.id ? null : prev));
+            }}
             onDelete={() => onFrameDelete(frame.id)}
             onDuplicate={() => onFrameDuplicate(frame.id)}
             onPolish={() => onFramePolish?.(frame.id)}
@@ -390,6 +543,22 @@ export function InfiniteCanvas({
             zoom={zoom}
             onPositionChange={(delta) => onFramePositionChange(frame.id, delta)}
             onPositionCommit={() => onFramePositionCommit?.(frame.id)}
+            canDrag={canDragFrames}
+            readOnly={readOnly}
+            connectMode={isConnectMode}
+            connectionState={
+              isConnectMode && sourceFrame
+                ? frame.id === sourceFrame.id
+                  ? "source"
+                  : hoveredConnectFrameId === frame.id
+                  ? connectionPairSet.has(`${sourceFrame.id}:${frame.id}`) || frame.id === sourceFrame.id
+                    ? "invalid-hover"
+                    : "target-hover"
+                  : connectionPairSet.has(`${sourceFrame.id}:${frame.id}`)
+                  ? "idle"
+                  : "target"
+                : "idle"
+            }
             beatModeEnabled={beatModeEnabled}
             durationMs={frame.durationMs}
             onDurationChange={(newDuration) => onFrameDurationChange?.(frame.id, newDuration)}

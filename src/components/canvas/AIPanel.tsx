@@ -22,24 +22,34 @@ import { GLMStoryboardWorkflow } from "@/components/canvas/GLMStoryboardWorkflow
 import { getConfiguredAIProvider } from "@/lib/ai/provider";
 import type { StoryboardDirectorControls } from "@/lib/ai/types";
 import {
-  generateStoryboardVideoPrompt,
   generateDirectorsTreatment,
   generateShotList as generateShotListAI,
   rewriteMasterPrompt,
   DirectorConfig,
 } from "@/lib/googleAI";
-import { generateVideoFromFrame } from "@/lib/videoGeneration";
+import {
+  buildStoryboardVideoPrompt,
+  enhanceStoryboardVideoPrompt,
+  generateVideoFromFrame,
+} from "@/lib/videoGeneration";
 import { supabase } from "@/lib/supabase";
+import {
+  getPolishStyleVideoDirection,
+  type PolishStyle,
+} from "@/lib/polishStyles";
 
 interface Frame {
   id: string;
   title?: string;
+  description?: string;
   status: "sketch" | "polished";
   durationMs?: number;
   motionNotes?: string;
+  animationStyle?: string;
   thumbnail?: string;
   polishedDataUrl?: string;
   sketchDataUrl?: string;
+  polishStyle?: PolishStyle;
 }
 
 interface AIPanelProps {
@@ -441,6 +451,8 @@ export function AIPanel({
   // Run-safety
   const runIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  const previousFramesNotReadyWarningRef = useRef<string | null>(null);
+  const previousVideoErrorRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -815,10 +827,13 @@ export function AIPanel({
       const orderedFrames = frames
         .map((f, index) => ({
           title: f.title || `Frame ${index + 1}`,
+          description: f.description,
           imageUrl: getFrameImageUrl(f) || "",
           durationMs: f.durationMs || 2000,
           motionNotes: f.motionNotes,
+          animationStyle: f.animationStyle,
           order: index,
+          polishStyle: f.polishStyle,
         }))
         .filter((f) => !!f.imageUrl);
 
@@ -832,7 +847,22 @@ export function AIPanel({
       setProgressSafe(20);
       setGenerationStep("prompting");
 
-      const promptResult = await generateStoryboardVideoPrompt(orderedFrames, selectedStyle);
+      const selectedMotionMode =
+        selectedFrame?.animationStyle ||
+        orderedFrames.find((frame) => frame.animationStyle)?.animationStyle ||
+        "static";
+      const localPromptResult = buildStoryboardVideoPrompt({
+        frames: orderedFrames,
+        selectedVisualMode: selectedStyle,
+        selectedMotionMode,
+        savedPolishStyle:
+          orderedFrames.find((frame) => frame.polishStyle)?.polishStyle || null,
+        revisionInput: "",
+      });
+      const promptResult = await enhanceStoryboardVideoPrompt(localPromptResult, {
+        frames: orderedFrames,
+        selectedVisualMode: selectedStyle,
+      });
 
       if (runIdRef.current !== runId || !mountedRef.current) return;
 
@@ -840,22 +870,30 @@ export function AIPanel({
       setProgressSafe(40);
       setGenerationStep("generating");
 
-      const imageBase64 = await toBase64DataUrl(firstFrame.imageUrl);
+      const imageInput = firstFrame.imageUrl;
 
       if (runIdRef.current !== runId || !mountedRef.current) return;
 
       const requestedSecondsRaw = Math.round((firstFrame.durationMs || 2000) / 1000);
-      const requestedSeconds = clamp(requestedSecondsRaw, 5, 60);
+      const requestedSeconds = clamp(requestedSecondsRaw, 5, 10);
 
       // Build the final Veo prompt - enhance with director guidance if enabled
       const basePrompt = promptResult?.masterPrompt || "Animate this scene with smooth motion";
-      const veoPrompt = directorEnabled
-        ? `${basePrompt}\n\n${buildDirectorGuidance(frames, directorSettings)}`
-        : basePrompt;
+      const styleReferenceFrame =
+        orderedFrames.find((frame) => frame.polishStyle) || firstFrame;
+      const polishStyleDirection = getPolishStyleVideoDirection(styleReferenceFrame.polishStyle);
+      const veoPromptSections = [
+        basePrompt,
+        polishStyleDirection
+          ? `VISUAL STYLE:\n${polishStyleDirection}\n\nSTYLE RULES:\n- preserve the exact subject and composition\n- keep the same framing and visual identity\n- no new objects or shot changes\n- motion should feel intentional and premium`
+          : null,
+        directorEnabled ? buildDirectorGuidance(frames, directorSettings) : null,
+      ].filter(Boolean);
+      const veoPrompt = veoPromptSections.join("\n\n");
 
       const videoResult = await generateVideoFromFrame(
         veoPrompt,
-        imageBase64,
+        imageInput,
         requestedSeconds,
         (progress, status) => {
           const scaled = 40 + clamp(progress, 0, 100) * 0.6;
@@ -953,10 +991,32 @@ export function AIPanel({
     totalFrames === 0
       ? null
       : frameImageStats.unpolished > 0
-      ? `Polish ${frameImageStats.unpolished} frame${frameImageStats.unpolished > 1 ? "s" : ""} first`
+      ? `Polish ${frameImageStats.unpolished} frame${frameImageStats.unpolished > 1 ? "s" : ""} first. Video generation needs image-ready storyboard frames before it can run.`
       : frameImageStats.missingImage > 0
-      ? `Missing images for ${frameImageStats.missingImage} frame${frameImageStats.missingImage > 1 ? "s" : ""}`
+      ? `Missing images for ${frameImageStats.missingImage} frame${frameImageStats.missingImage > 1 ? "s" : ""}. Add or polish those frames before generating video.`
       : null;
+
+  useEffect(() => {
+    const shouldOpenForWarning =
+      !!framesNotReadyWarning &&
+      previousFramesNotReadyWarningRef.current !== framesNotReadyWarning;
+
+    if (!showVideoPanel && shouldOpenForWarning) {
+      setShowVideoPanel(true);
+    }
+
+    previousFramesNotReadyWarningRef.current = framesNotReadyWarning;
+  }, [framesNotReadyWarning, showVideoPanel]);
+
+  useEffect(() => {
+    const shouldOpenForError = !!error && previousVideoErrorRef.current !== error;
+
+    if (!showVideoPanel && shouldOpenForError) {
+      setShowVideoPanel(true);
+    }
+
+    previousVideoErrorRef.current = error;
+  }, [error, showVideoPanel]);
 
   // Compact select component
   const CompactSelect = ({
@@ -1867,6 +1927,8 @@ export function AIPanel({
             </AnimatePresence>
 
             <button
+              type="button"
+              data-testid="ai-video-generate-button"
               onClick={handleGenerateVideo}
               disabled={!canGenerate}
               className={cn(
@@ -1895,13 +1957,20 @@ export function AIPanel({
             </button>
 
             <p className="text-[10px] text-white/40 text-center">
-              Gemini prompts + Google video generation
+              Style-aware AI video generation
             </p>
 
-            {error && <p className="text-[10px] text-red-400 text-center">{error}</p>}
+            {error && (
+              <p data-ai-panel-error role="alert" className="text-[10px] text-red-400 text-center">
+                {error}
+              </p>
+            )}
 
             {framesNotReadyWarning && !isGenerating && (
-              <p className="text-[10px] text-amber-400/70 text-center">
+              <p
+                data-testid="ai-video-frames-not-ready"
+                className="text-[10px] text-amber-400/70 text-center"
+              >
                 {framesNotReadyWarning}
               </p>
             )}
@@ -2059,6 +2128,8 @@ export function AIPanel({
           </AnimatePresence>
 
           <button
+            type="button"
+            data-testid="ai-video-generate-button"
             onClick={handleGenerateVideo}
             disabled={!canGenerate}
             className={cn(
@@ -2087,13 +2158,20 @@ export function AIPanel({
           </button>
 
           <p className="text-[10px] text-white/40 text-center mt-2">
-            Gemini prompts + Google video generation
+            Style-aware AI video generation
           </p>
 
-          {error && <p className="text-[10px] text-red-400 text-center mt-2">{error}</p>}
+          {error && (
+            <p data-ai-panel-error role="alert" className="text-[10px] text-red-400 text-center mt-2">
+              {error}
+            </p>
+          )}
 
           {framesNotReadyWarning && !isGenerating && (
-            <p className="text-[10px] text-amber-400/70 text-center mt-2">
+            <p
+              data-testid="ai-video-frames-not-ready"
+              className="text-[10px] text-amber-400/70 text-center mt-2"
+            >
               {framesNotReadyWarning}
             </p>
           )}

@@ -67,6 +67,8 @@ export function FloatingNotification({ bellRef }: FloatingNotificationProps) {
             damping: 30,
             duration: activeNotification.flyToHeader ? 0.4 : 0.3,
           }}
+          data-testid="floating-notification"
+          data-notification-type={activeNotification.type}
           className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-sm shadow-lg ${colorMap[activeNotification.type]}`}
         >
           {(() => {
