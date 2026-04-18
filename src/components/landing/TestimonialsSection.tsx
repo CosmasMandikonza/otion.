@@ -10,27 +10,27 @@ import {
 const benefits = [
   {
     icon: BenefitSpeedIcon,
-    heading: "Fewer review resets",
+    heading: "Missing inputs are caught early",
     description:
-      "The team can move from rough board to a concrete shot plan faster because direction and revision context live beside the frames.",
+      "Video and planning flows warn before they run when the board is missing the assets or metadata they need.",
   },
   {
     icon: BenefitConsistencyIcon,
-    heading: "Continuity stays visible",
+    heading: "Failures stay visible",
     description:
-      "Camera intent, pacing, and continuity rules are surfaced before the work gets polished into something expensive to redo.",
+      "Polish and planning failures surface as readable product states instead of silent dead ends.",
   },
   {
     icon: CollaborationIcon,
-    heading: "Creative notes stop fragmenting",
+    heading: "Share and review stay stable",
     description:
-      "Storyboard edits, direction changes, and review feedback stay in one canvas instead of splitting across docs and chat threads.",
+      "Public access, copy-link behavior, and read-only review flows are built to hold up during real collaboration.",
   },
   {
     icon: ExportIcon,
-    heading: "Better handoff into the next pass",
+    heading: "Export stays usable",
     description:
-      "Once the board feels right, the team has a readable plan to hand into polish, drafting tools, and export without guessing what changed.",
+      "Even when no video exists yet, the export surface resolves safely and stays readable instead of collapsing into a blank page.",
   },
 ];
 
@@ -62,15 +62,15 @@ export function TestimonialsSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6">
             <BenefitSpeedIcon className="w-4 h-4" />
-            <span className="text-sm font-medium text-white">Built for the review loop</span>
+            <span className="text-sm font-medium text-white">Reliable at the edges</span>
           </div>
           <h2 className="font-display font-bold text-4xl md:text-5xl text-white mb-4">
-            Direction gets{" "}
-            <span className="gradient-text">clearer before production.</span>
+            Built for the moments{" "}
+            <span className="gradient-text">creative tools usually break.</span>
           </h2>
           <p className="text-xl text-white/70 max-w-2xl mx-auto">
-            SketchMotion is strongest when a creative team needs to align the storyboard, plan the
-            next pass, and react to feedback without losing the thread.
+            SketchMotion is designed so review loops keep moving through missing inputs, provider
+            failures, share-state changes, and empty export states.
           </p>
         </motion.div>
 

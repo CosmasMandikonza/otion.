@@ -72,11 +72,11 @@ function CanvasPreview() {
       <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-4">
         <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3 py-1.5 backdrop-blur-sm">
           <PanelRightOpen className="h-3.5 w-3.5 text-sm-magenta" />
-          <span className="text-[11px] font-medium text-white/85">Direction Studio</span>
+          <span className="text-[11px] font-medium text-white/85">Storyboard Workspace</span>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 backdrop-blur-sm">
           <span className="h-2 w-2 rounded-full bg-emerald-300" />
-          <span className="text-[11px] font-medium text-white/85">Live Plan ready</span>
+          <span className="text-[11px] font-medium text-white/85">Review-ready</span>
         </div>
       </div>
 
@@ -120,8 +120,8 @@ function CanvasPreview() {
           <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">2.0s</span>
         </div>
         <div className="aspect-[4/3] rounded-xl bg-gradient-to-br from-sm-pink/30 to-sm-coral/20" />
-        <p className="mt-2 text-xs text-white/80">Opening reveal</p>
-        <p className="mt-1 text-[11px] text-white/45">Slow push with soft backlight</p>
+        <p className="mt-2 text-xs text-white/80">Hero beat</p>
+        <p className="mt-1 text-[11px] text-white/45">Rough board with timing notes</p>
       </motion.div>
 
       <motion.div
@@ -135,8 +135,8 @@ function CanvasPreview() {
           <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">1.5s</span>
         </div>
         <div className="aspect-[4/3] rounded-xl bg-gradient-to-br from-sm-soft-purple/25 to-sm-purple/25" />
-        <p className="mt-2 text-xs text-white/80">Detail beat</p>
-        <p className="mt-1 text-[11px] text-white/45">Lens tightens, pace quickens</p>
+        <p className="mt-2 text-xs text-white/80">Polished frame</p>
+        <p className="mt-1 text-[11px] text-white/45">Visual style carries into motion</p>
       </motion.div>
 
       <motion.div
@@ -147,16 +147,16 @@ function CanvasPreview() {
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-white/45">Live Plan</p>
-            <h4 className="mt-1 text-sm font-semibold text-white">Revision-aware direction</h4>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/45">Review Flow</p>
+            <h4 className="mt-1 text-sm font-semibold text-white">Polish, motion, and revision</h4>
           </div>
           <div className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/60">
-            Shot plan
+            Ready to share
           </div>
         </div>
 
         <div className="mb-3 flex flex-wrap gap-1.5">
-          {["Moody", "Measured", "Continuity locked"].map((chip) => (
+          {["Style-aware", "Review-ready", "Guardrails on"].map((chip) => (
             <span
               key={chip}
               className="rounded-full border border-white/10 bg-white/8 px-2 py-1 text-[10px] text-white/72"
@@ -169,30 +169,30 @@ function CanvasPreview() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
           <div className="mb-2 flex items-center gap-2">
             <GitBranch className="h-3.5 w-3.5 text-sm-magenta" />
-            <span className="text-xs font-medium text-white/80">Plan highlights</span>
+            <span className="text-xs font-medium text-white/80">Workflow highlights</span>
           </div>
           <ul className="space-y-2 text-[11px] leading-relaxed text-white/63">
-            <li>Open wide, then tighten camera on frame two for the reveal.</li>
-            <li>Carry lighting direction across every beat to avoid continuity drift.</li>
-            <li>Hold the ending beat longer so the revision can land cleanly.</li>
+            <li>Polish rough frames without changing the shot.</li>
+            <li>Carry the chosen visual style into motion generation.</li>
+            <li>Revise, share, and export without rebuilding the board.</li>
           </ul>
         </div>
 
         <div className="mt-3 rounded-2xl border border-sm-magenta/20 bg-sm-magenta/10 px-3 py-2 text-[11px] text-white/82">
-          Revision: slow the second beat and keep the lens consistent.
+          Review note: keep the timing, soften the camera move, and export this pass for feedback.
         </div>
       </motion.div>
 
       <div className="absolute bottom-5 right-5 left-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 px-3 py-2 backdrop-blur-sm">
         <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-white/40">Storyboards stay in control</p>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-white/40">Keep the creative loop moving</p>
           <p className="truncate text-xs text-white/75">
-            Direction, continuity, and revisions stay attached to the board.
+            Sketch, polish, motion, review, and export stay in one workspace.
           </p>
         </div>
         <div className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2 py-1 text-[10px] text-white/75">
           <RefreshCcw className="h-3 w-3" />
-          Revise
+          Ready to share
         </div>
       </div>
     </div>
@@ -221,7 +221,7 @@ export function HeroSection() {
               transition={{ delay: 0.2 }}
             >
               <Sparkles className="w-4 h-4 text-sm-magenta" />
-              <span className="text-sm font-medium text-white">Direction Studio with live planning</span>
+              <span className="text-sm font-medium text-white">Storyboard-to-motion workspace you can trust</span>
             </motion.div>
 
             <div className="relative">
@@ -229,15 +229,15 @@ export function HeroSection() {
                 <DancingMascot />
               </div>
               <h1 className="font-display font-extrabold text-5xl md:text-6xl lg:text-7xl text-white leading-tight mb-6">
-                Direct the storyboard{" "}
-                <span className="gradient-text">before the render.</span>
+                From rough boards{" "}
+                <span className="gradient-text">to review-ready motion.</span>
               </h1>
             </div>
 
             <p className="text-xl text-white/80 mb-8 max-w-2xl mx-auto lg:mx-0">
-              SketchMotion keeps storyboards at the center of the review loop. Shape direction in
-              Direction Studio, run the GLM Director Workflow, lock continuity, and revise the shot
-              plan without losing the creative thread.
+              SketchMotion gives storyboard artists, creative leads, and motion teams one place to
+              sketch frames, polish visuals, generate motion, review revisions, share boards, and
+              export with confidence. Built to stay usable where creative tools usually break.
             </p>
 
             <div className="flex justify-center lg:justify-start">
@@ -246,7 +246,7 @@ export function HeroSection() {
                   size="lg"
                   className="bg-sm-magenta hover:bg-sm-magenta/90 text-white font-bold text-lg px-8 py-6 shadow-glow hover:shadow-glow-lg transition-all btn-press group"
                 >
-                  Open the Studio
+                  Open SketchMotion
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
@@ -257,8 +257,8 @@ export function HeroSection() {
                 <PanelRightOpen className="w-5 h-5 text-white" />
               </div>
               <p className="text-white/70 text-sm">
-                Built for storyboard artists, creative leads, and motion teams who need better
-                direction before production starts.
+                Made for storyboard artists, creative leads, motion teams, and reviewers who need
+                a dependable handoff from board to polish, motion, and export.
               </p>
             </div>
           </motion.div>

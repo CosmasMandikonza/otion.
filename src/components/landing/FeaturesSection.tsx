@@ -15,42 +15,42 @@ const features = [
     icon: StoryboardIcon,
     title: "Storyboard-first from the first frame",
     description:
-      "Sequence frames, durations, and motion notes on the canvas before anyone starts chasing a render.",
+      "Build the sequence on canvas with frames, durations, and motion notes before anyone commits to a render.",
     color: "from-sm-pink to-sm-coral",
   },
   {
     icon: AIPolishIcon,
-    title: "Direction Studio stays in the loop",
+    title: "Reliable AI polish for rough sketches",
     description:
-      "Mood, pacing, camera, lighting, color, and continuity stay attached to the board instead of getting lost in a separate brief.",
+      "Turn loose boards into cleaner frames while preserving the shot, subject, and composition the team already approved.",
     color: "from-sm-soft-purple to-sm-purple",
   },
   {
     icon: BenefitWorkflowIcon,
-    title: "Live planning from the board you already have",
+    title: "Style-aware motion generation",
     description:
-      "The GLM Director Workflow turns ordered storyboard context into analysis, shot planning, continuity rules, and a render strategy.",
+      "Use polished storyboard imagery and saved style choices to drive motion without losing the look you already established.",
     color: "from-sm-magenta to-sm-pink",
   },
   {
     icon: BenefitConsistencyIcon,
-    title: "Continuity issues surface early",
+    title: "Review and revise in one place",
     description:
-      "Catch drift in pacing, camera logic, and scene continuity before the team spends time polishing the wrong beat.",
+      "Revision notes, planning guidance, and next-pass decisions stay attached to the board instead of getting rewritten in side docs.",
     color: "from-sm-mint to-sm-soft-purple",
   },
   {
     icon: VersionHistoryIcon,
-    title: "Revision-aware shot planning",
+    title: "Shareable boards for feedback",
     description:
-      "Change the direction, keep the board, and update the plan without restarting from zero every time feedback lands.",
+      "Open public, read-only review links so collaborators can follow the board without unlocking edit controls.",
     color: "from-sm-coral to-sm-pink",
   },
   {
     icon: CollaborationIcon,
-    title: "One canvas for the whole review loop",
+    title: "Guardrails where creative tools usually break",
     description:
-      "Creative leads, storyboard artists, and collaborators can work in one place instead of hopping between notes, boards, and prompt docs.",
+      "Missing inputs, provider failures, empty exports, and invalid states surface clearly instead of derailing the session.",
     color: "from-sm-purple to-sm-magenta",
   },
 ];
@@ -83,15 +83,15 @@ export function FeaturesSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6">
             <BenefitWorkflowIcon className="w-4 h-4" />
-            <span className="text-sm font-medium text-white">Storyboard-first creative control</span>
+            <span className="text-sm font-medium text-white">Reliable creative workflow</span>
           </div>
           <h2 className="font-display font-bold text-4xl md:text-5xl text-white mb-4">
             One workspace for{" "}
-            <span className="gradient-text">direction, planning, and revision.</span>
+            <span className="gradient-text">storyboard, polish, motion, and review.</span>
           </h2>
           <p className="text-xl text-white/70 max-w-3xl mx-auto">
-            Instead of jumping from storyboard to prompt doc to review notes, shape the direction
-            and keep the plan attached to the board the team is already using.
+            SketchMotion keeps the board at the center while polish, planning guidance, generation,
+            and handoff stay attached to the work instead of scattered across tools.
           </p>
         </motion.div>
 
@@ -128,11 +128,11 @@ export function FeaturesSection() {
           <GlassCard className="p-8 md:p-12">
             <div className="text-center mb-10">
               <h3 className="font-display font-bold text-2xl md:text-3xl text-white mb-2">
-                How SketchMotion flows today
+                From storyboard to review-ready output
               </h3>
               <p className="text-white/70">
-                Sequence the board, save direction, and revise the live plan without breaking the
-                review loop.
+                Build the board, polish the visuals, generate motion, then review, share, and
+                export from the same workflow.
               </p>
             </div>
 
@@ -148,8 +148,8 @@ export function FeaturesSection() {
                 </div>
                 <h4 className="font-display font-bold text-lg text-white mb-2">Build the board</h4>
                 <p className="text-white/60 text-sm">
-                  Arrange storyboard frames, durations, and motion notes on the same canvas the
-                  team reviews.
+                  Arrange frames, notes, and timing on the canvas so the sequence has structure
+                  before generation begins.
                 </p>
               </div>
 
@@ -174,10 +174,10 @@ export function FeaturesSection() {
                     2
                   </div>
                 </div>
-                <h4 className="font-display font-bold text-lg text-white mb-2">Set direction</h4>
+                <h4 className="font-display font-bold text-lg text-white mb-2">Polish and generate motion</h4>
                 <p className="text-white/60 text-sm">
-                  Save mood, pacing, camera, lighting, and continuity so the live plan knows what
-                  the board is aiming for.
+                  Clean up rough visuals and generate style-aware motion from the board imagery
+                  that is already in context.
                 </p>
               </div>
 
@@ -190,10 +190,10 @@ export function FeaturesSection() {
                     3
                   </div>
                 </div>
-                <h4 className="font-display font-bold text-lg text-white mb-2">Review and revise</h4>
+                <h4 className="font-display font-bold text-lg text-white mb-2">Review, share, and export</h4>
                 <p className="text-white/60 text-sm">
-                  Read the plan, adjust the direction, and hand off a clearer creative path before
-                  moving into polish or export.
+                  Use planning guidance where it helps, keep revisions visible, send read-only
+                  links, and export from a stable finishing surface.
                 </p>
               </div>
             </div>

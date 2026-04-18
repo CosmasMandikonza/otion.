@@ -17,7 +17,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-white/60 text-sm mb-4">
-              Storyboard-first direction and planning for creative teams.
+              Storyboard-to-motion workspace for dependable creative review.
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-white/40 hover:text-white transition-colors">
@@ -72,7 +72,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-white/40 text-sm">
-            © 2024 SketchMotion. All rights reserved.
+            (c) 2024 SketchMotion. All rights reserved.
           </p>
           <div className="flex gap-6">
             <a href="#" className="text-white/40 hover:text-white transition-colors text-sm">Privacy Policy</a>

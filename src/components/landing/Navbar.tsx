@@ -68,7 +68,7 @@ export function Navbar() {
             onClick={(e) => handleSmoothScroll(e, 'testimonials')}
             className="text-white/80 hover:text-white transition-colors font-medium cursor-pointer"
           >
-            Benefits
+            Why it works
           </a>
         </div>
 
@@ -86,7 +86,7 @@ export function Navbar() {
             <Button 
               className="bg-sm-magenta hover:bg-sm-magenta/90 text-white font-semibold px-6 shadow-glow hover:shadow-glow-lg transition-all btn-press"
             >
-              Open Studio
+              Open Workspace
             </Button>
           </Link>
         </div>
@@ -126,7 +126,7 @@ export function Navbar() {
             onClick={(e) => handleSmoothScroll(e, 'testimonials')}
             className="text-white/80 hover:text-white transition-colors font-medium py-2 cursor-pointer"
           >
-            Benefits
+            Why it works
           </a>
           <hr className="border-white/20" />
           <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
@@ -141,7 +141,7 @@ export function Navbar() {
             <Button 
               className="w-full bg-sm-magenta hover:bg-sm-magenta/90 text-white font-semibold shadow-glow"
             >
-              Open Studio
+              Open Workspace
             </Button>
           </Link>
         </div>

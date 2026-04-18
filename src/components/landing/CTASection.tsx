@@ -21,17 +21,17 @@ export function CTASection() {
             <div className="relative z-10">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sm-magenta/20 border border-sm-magenta/30 mb-6">
                 <Sparkles className="w-4 h-4 text-sm-magenta" />
-                <span className="text-sm font-medium text-white">Storyboard-first direction workflow</span>
+                <span className="text-sm font-medium text-white">Reliable creative workflow</span>
               </div>
 
               <h2 className="font-display font-bold text-3xl md:text-5xl text-white mb-4">
-                Open a board and{" "}
-                <span className="gradient-text">direct the next pass.</span>
+                Keep the board moving{" "}
+                <span className="gradient-text">from sketch to handoff.</span>
               </h2>
 
               <p className="text-lg text-white/70 mb-8 max-w-2xl mx-auto">
-                Set the direction, review the live plan, and revise the shot strategy before the
-                team spends time on the wrong render.
+                Open a board, polish rough frames, generate motion, revise what changed, and export
+                the result without resetting the workflow every time something goes wrong.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -47,7 +47,8 @@ export function CTASection() {
               </div>
 
               <p className="mt-6 text-sm text-white/50">
-                Start from a blank board or load a demo storyboard to walk the full flow.
+                Built for storyboard artists, creative leads, motion teams, and reviewers working
+                through real feedback cycles.
               </p>
             </div>
           </GlassCard>

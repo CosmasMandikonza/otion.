@@ -11,57 +11,58 @@ const plans = [
     name: "Starter",
     price: "$0",
     period: "forever",
-    description: "Try the storyboard-first workflow without committing a team.",
+    description: "For storyboard artists shaping rough boards and testing the workflow.",
     icon: PricingSoloIcon,
     color: "from-sm-pink to-sm-coral",
     features: [
-      "5 boards to prototype direction",
-      "Direction Studio controls",
-      "Live plan generation",
-      "Continuity and render guidance",
+      "5 boards",
+      "Storyboard canvas and frame editing",
+      "AI polish",
+      "Style-aware video generation",
+      "Share links and export basics",
       "No credit card required",
     ],
     cta: "Start Free",
     popular: false,
   },
   {
-    name: "Founding Pro",
+    name: "Pro Review",
     price: "$12",
     originalPrice: "$19",
-    period: "/mo forever",
-    description: "For creative leads running active storyboard reviews.",
+    period: "/mo",
+    description: "For creative leads who need reliable polish, motion, and revision loops.",
     icon: PricingTeamIcon,
     color: "from-sm-magenta to-sm-pink",
     features: [
       "Unlimited boards",
-      "Revision-aware planning",
-      "Beat timing and motion notes",
-      "Version history",
-      "Drafting tools and exports",
+      "Revision-aware planning guidance",
+      "Style-aware video workflow",
+      "Export surface and version history",
+      "Public review links",
+      "Visible failure handling and guardrails",
       "Priority support",
-      "No watermarks",
     ],
-    cta: "Claim Founding Price",
+    cta: "Choose Pro",
     popular: true,
   },
   {
-    name: "Founding Team",
+    name: "Team Workspace",
     price: "$29",
     originalPrice: "$49",
-    period: "/mo forever",
-    description: "For studios that want one canvas for planning and review.",
+    period: "/mo",
+    description: "For motion teams collaborating across boards, reviews, and handoff.",
     icon: PricingStudioIcon,
     color: "from-sm-purple to-sm-soft-purple",
     features: [
-      "Everything in Pro",
+      "Everything in Pro Review",
       "Real-time collaboration",
-      "Shared board access",
-      "Reviewer-friendly direction workflow",
-      "Admin visibility",
-      "Studio onboarding",
+      "Reviewer-friendly public boards",
+      "Shared board visibility",
+      "Team-ready exports",
+      "Onboarding support",
       "Dedicated support",
     ],
-    cta: "Claim Founding Price",
+    cta: "Start Team Plan",
     popular: false,
   },
 ];
@@ -94,14 +95,15 @@ export function PricingSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6">
             <PricingSoloIcon className="w-4 h-4" />
-            <span className="text-sm font-medium text-white">Plans for creators and teams</span>
+            <span className="text-sm font-medium text-white">Plans for artists, leads, and teams</span>
           </div>
           <h2 className="font-display font-bold text-4xl md:text-5xl text-white mb-4">
-            Pick the workflow{" "}
-            <span className="gradient-text">that matches your team.</span>
+            Choose the setup{" "}
+            <span className="gradient-text">that fits your review loop.</span>
           </h2>
           <p className="text-xl text-white/70 max-w-2xl mx-auto">
-            Start with storyboard-first direction and scale into shared planning, review, and handoff.
+            Start on a single-board workflow, then scale into shared review, revision, and export
+            without changing tools.
           </p>
         </motion.div>
 
@@ -183,7 +185,7 @@ export function PricingSection() {
             <a href="#" className="text-sm-magenta hover:underline">
               Talk to the team
             </a>{" "}
-            and we will point you to the right workflow.
+            and we will point you to the right setup.
           </p>
         </motion.div>
       </div>
