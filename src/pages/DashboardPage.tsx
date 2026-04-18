@@ -776,16 +776,25 @@ export function DashboardPage() {
                     transition={{ duration: 0.2 }}
                   >
                     {/* New Board Card */}
-                    <GlassCard
-                      hover
-                      className="aspect-[4/3] flex flex-col items-center justify-center gap-4 border-2 border-dashed border-white/20 hover:border-sm-magenta/50 cursor-pointer"
-                      onClick={handleCreateBoard}
+                    <Link
+                      to="/canvas/new"
+                      aria-label="Create New Board"
+                      className="block"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        void handleCreateBoard();
+                      }}
                     >
-                      <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
-                        <Plus className="w-8 h-8 text-white/60" />
-                      </div>
-                      <span className="text-white/60 font-medium">Create New Board</span>
-                    </GlassCard>
+                      <GlassCard
+                        hover
+                        className="aspect-[4/3] flex flex-col items-center justify-center gap-4 border-2 border-dashed border-white/20 hover:border-sm-magenta/50 cursor-pointer"
+                      >
+                        <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
+                          <Plus className="w-8 h-8 text-white/60" />
+                        </div>
+                        <span className="text-white/60 font-medium">New Board</span>
+                      </GlassCard>
+                    </Link>
 
                     {/* Board Cards */}
                     {filteredBoards.map((board, index) => (

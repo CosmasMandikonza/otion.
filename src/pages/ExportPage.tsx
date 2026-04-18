@@ -102,55 +102,67 @@ export function ExportPage() {
   // Fetch board and videos
   useEffect(() => {
     async function fetchData() {
-      if (!boardId) return;
-      
-      // Get board
-      const { data: boardData } = await supabase
-        .from('boards')
-        .select('*')
-        .eq('id', boardId)
-        .single();
-      
-      if (boardData) setBoard(boardData);
-      
-      // Get videos for this board (version history)
-      const { data: videosData } = await supabase
-        .from('videos')
-        .select('*')
-        .eq('board_id', boardId)
-        .order('created_at', { ascending: false });
-      
-      if (videosData && videosData.length > 0) {
-        setVideos(videosData);
-        setSelectedVersion(videosData[0].id);
+      if (!boardId) {
+        setLoading(false);
+        return;
       }
-      
-      // Also check sessionStorage for just-generated video
-      const newVideoUrl = sessionStorage.getItem('generatedVideoUrl');
-      if (newVideoUrl && (!videosData || !videosData.find(v => v.video_url === newVideoUrl))) {
-        // Save new video to database
-        const { data: newVideo } = await supabase
-          .from('videos')
-          .insert({
-            board_id: boardId,
-            video_url: newVideoUrl,
-            prompt: sessionStorage.getItem('generatedVideoPrompt'),
-            version_number: (videosData?.length || 0) + 1,
-            version_label: `v${(videosData?.length || 0) + 1}`,
-            status: 'completed'
-          })
-          .select()
+
+      try {
+        // Get board
+        const { data: boardData } = await supabase
+          .from('boards')
+          .select('*')
+          .eq('id', boardId)
           .single();
-        
-        if (newVideo) {
-          setVideos([newVideo, ...(videosData || [])]);
-          setSelectedVersion(newVideo.id);
-          sessionStorage.removeItem('generatedVideoUrl');
-          sessionStorage.removeItem('generatedVideoPrompt');
+
+        if (boardData) setBoard(boardData);
+
+        // Get videos for this board (version history)
+        const { data: videosData } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('board_id', boardId)
+          .order('created_at', { ascending: false });
+
+        if (videosData && videosData.length > 0) {
+          setVideos(videosData);
+          setSelectedVersion(videosData[0].id);
+        } else {
+          setVideos([]);
+          setSelectedVersion(null);
         }
+
+        // Also check sessionStorage for just-generated video
+        const newVideoUrl = sessionStorage.getItem('generatedVideoUrl');
+        if (newVideoUrl && (!videosData || !videosData.find(v => v.video_url === newVideoUrl))) {
+          // Save new video to database
+          const { data: newVideo } = await supabase
+            .from('videos')
+            .insert({
+              board_id: boardId,
+              video_url: newVideoUrl,
+              prompt: sessionStorage.getItem('generatedVideoPrompt'),
+              version_number: (videosData?.length || 0) + 1,
+              version_label: `v${(videosData?.length || 0) + 1}`,
+              status: 'completed'
+            })
+            .select()
+            .single();
+
+          if (newVideo) {
+            setVideos([newVideo, ...(videosData || [])]);
+            setSelectedVersion(newVideo.id);
+            sessionStorage.removeItem('generatedVideoUrl');
+            sessionStorage.removeItem('generatedVideoPrompt');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load export data:', error);
+        setVideos([]);
+        setSelectedVersion(null);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     }
     
     fetchData();
@@ -208,7 +220,7 @@ export function ExportPage() {
   }, [board?.name, resolution, selectedFormat]);
 
   // Get current video based on selection
-  const currentVideo = videos.find(v => v.id === selectedVersion) || videos[0];
+  const currentVideo = videos.find(v => v.id === selectedVersion) || videos[0] || null;
 
   const handleDownload = useCallback(() => {
     if (currentVideo?.video_url) {
@@ -307,7 +319,12 @@ export function ExportPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-white/5">
-                      <p className="text-white/40">No video selected</p>
+                      <div className="text-center px-6">
+                        <p className="text-white/50 font-medium">No videos generated yet</p>
+                        <p className="text-xs text-white/35 mt-1">
+                          Generate a video from the canvas to preview and export it here.
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -464,7 +481,10 @@ export function ExportPage() {
                       </motion.div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-white/40">
+                    <div
+                      data-testid="export-no-videos-hint"
+                      className="text-center py-8 text-white/40"
+                    >
                       <p>No videos generated yet</p>
                       <p className="text-sm mt-1">Generate a video from the canvas</p>
                     </div>
