@@ -42,6 +42,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { polishSketch, polishSketchWithStyle, suggestMotionNotes, checkContinuity } from "@/lib/googleAI";
+import {
+  clearFramePolishStyle,
+  loadFramePolishStyleMap,
+  saveFramePolishStyle,
+  type PolishStyle,
+} from "@/lib/polishStyles";
 
 // Frame status type
 type FrameStatus = "sketch" | "polished";
@@ -82,6 +88,7 @@ interface Frame {
   // Motion notes for animation
   motionNotes?: string;
   animationStyle?: AnimationStyle;
+  polishStyle?: PolishStyle;
 }
 
 interface Connection {
@@ -223,6 +230,7 @@ export function CanvasPage() {
 
   // Connection mode state
   const [connectingFromFrameId, setConnectingFromFrameId] = useState<string | null>(null);
+  const isCreatingConnectionRef = useRef(false);
 
   // Sketch editor state
   const [isSketchEditorOpen, setIsSketchEditorOpen] = useState(false);
@@ -252,6 +260,13 @@ export function CanvasPage() {
     severity: 'low' | 'medium' | 'high';
   }>>([]);
   const [showContinuityModal, setShowContinuityModal] = useState(false);
+  const [framePolishStyles, setFramePolishStyles] = useState<Record<string, PolishStyle>>(() =>
+    loadFramePolishStyleMap(boardId),
+  );
+
+  useEffect(() => {
+    setFramePolishStyles(loadFramePolishStyleMap(boardId));
+  }, [boardId]);
 
   // Convert Supabase board data to component format
   const frames = useMemo<Frame[]>(() => {
@@ -268,8 +283,9 @@ export function CanvasPage() {
       durationMs: f.durationMs,
       motionNotes: f.motionNotes || undefined,
       animationStyle: (f.animationStyle as AnimationStyle) || undefined,
+      polishStyle: framePolishStyles[f.id],
     }));
-  }, [board]);
+  }, [board, framePolishStyles]);
 
   const connections = useMemo<Connection[]>(() => {
     if (!board) return [];
@@ -431,18 +447,33 @@ export function CanvasPage() {
   }, [updateBoardName]);
 
   const handleToolChange = useCallback((tool: string) => {
+    if (isReadOnly && tool === "connector") {
+      return;
+    }
+
     setActiveTool(tool);
     // Clear connection state when switching away from connector tool
     if (tool !== "connector") {
       setConnectingFromFrameId(null);
     }
-  }, []);
+  }, [isReadOnly]);
+
+  useEffect(() => {
+    if (isReadOnly && activeTool === "connector") {
+      setActiveTool("select");
+      setConnectingFromFrameId(null);
+    }
+  }, [activeTool, isReadOnly]);
 
   // Delete a connection
   const handleConnectionDelete = useCallback(async (connectionId: string) => {
-    await deleteConnection(connectionId);
-    info("🔗 Connection removed");
-  }, [deleteConnection, info]);
+    if (isReadOnly) return;
+
+    const deleted = await deleteConnection(connectionId);
+    if (deleted) {
+      info("🔗 Connection removed");
+    }
+  }, [deleteConnection, info, isReadOnly]);
 
   const handleZoomIn = useCallback(() => {
     setZoom((prev) => Math.min(prev + 0.1, 2));
@@ -463,12 +494,18 @@ export function CanvasPage() {
   const handleFrameSelect = useCallback(async (id: string, multiSelect?: boolean) => {
     // Handle connector tool mode
     if (activeTool === "connector") {
+      if (isReadOnly) return;
       if (!connectingFromFrameId) {
         // First click - set the "from" frame
         setConnectingFromFrameId(id);
         setSelectedFrames([id]);
+        broadcastFrameSelect(id, userName, userColor);
         info("🔗 Click another frame to connect");
       } else if (connectingFromFrameId !== id) {
+        if (isCreatingConnectionRef.current) {
+          return;
+        }
+
         // Second click - create the connection
         const existingConnection = connections.find(
           c => (c.from === connectingFromFrameId && c.to === id) ||
@@ -476,17 +513,24 @@ export function CanvasPage() {
         );
 
         if (!existingConnection) {
-          await createConnection(connectingFromFrameId, id);
-          success(`🔗 Connection ${connections.length + 1} created`);
+          isCreatingConnectionRef.current = true;
+          const newConnection = await createConnection(connectingFromFrameId, id);
+          isCreatingConnectionRef.current = false;
+          if (newConnection) {
+            success(`🔗 Connection ${connections.length + 1} created`);
+            broadcastFrameSelect(null, userName, userColor);
+            setConnectingFromFrameId(null);
+            setSelectedFrames([]);
+          }
         } else {
-          info("Already connected");
+          info("Those frames are already connected");
+          return;
         }
-        setConnectingFromFrameId(null);
-        setSelectedFrames([]);
       } else {
         // Clicked the same frame - cancel connection
         setConnectingFromFrameId(null);
         setSelectedFrames([]);
+        broadcastFrameSelect(null, userName, userColor);
         info("Connection cancelled");
       }
       return;
@@ -504,16 +548,18 @@ export function CanvasPage() {
 
       return newSelection;
     });
-  }, [activeTool, connectingFromFrameId, connections, createConnection, info, success, broadcastFrameSelect, userName, userColor]);
+  }, [activeTool, connectingFromFrameId, connections, createConnection, info, success, broadcastFrameSelect, userName, userColor, isReadOnly]);
 
   const handleFrameDelete = useCallback(async (id: string) => {
+    if (isReadOnly) return;
     await deleteFrame(id);
     setSelectedFrames((prev) => prev.filter((f) => f !== id));
-  }, [deleteFrame]);
+  }, [deleteFrame, isReadOnly]);
 
   // Handle frame position change during drag.
   // Keep updates local-first and paint them at most once per animation frame.
   const handleFramePositionChange = useCallback((id: string, { dx, dy }: { dx: number; dy: number }) => {
+    if (isReadOnly) return;
     const basePos = workingPositionsRef.current.get(id) || framePositionMap.get(id);
     if (!basePos) return;
 
@@ -528,9 +574,10 @@ export function CanvasPage() {
 
     // Broadcast movement to other collaborators (throttled)
     throttledFrameMoveBroadcast(id, nextPos);
-  }, [framePositionMap, scheduleDragPositionFlush, throttledFrameMoveBroadcast]);
+  }, [framePositionMap, scheduleDragPositionFlush, throttledFrameMoveBroadcast, isReadOnly]);
 
   const handleFramePositionCommit = useCallback(async (id: string) => {
+    if (isReadOnly) return;
     const finalPos = workingPositionsRef.current.get(id) || framePositionMap.get(id);
     if (!finalPos) return;
 
@@ -544,9 +591,10 @@ export function CanvasPage() {
       next.delete(id);
       return next;
     });
-  }, [framePositionMap, updateFramePosition]);
+  }, [framePositionMap, updateFramePosition, isReadOnly]);
 
   const handleFrameDuplicate = useCallback(async (id: string) => {
+    if (isReadOnly) return;
     const frame = frames.find((f) => f.id === id);
     if (frame) {
       const newFrame = await createFrame(
@@ -565,11 +613,27 @@ export function CanvasPage() {
           animationStyle: frame.animationStyle || 'static',
           durationMs: frame.durationMs || 2000,
         });
+
+        if (boardId && frame.polishStyle) {
+          setFramePolishStyles(saveFramePolishStyle(boardId, newFrame.id, frame.polishStyle));
+        }
       }
     }
-  }, [frames, createFrame, updateFrame]);
+  }, [boardId, frames, createFrame, updateFrame, isReadOnly]);
 
-  const handleCanvasClick = useCallback(async (position: { x: number; y: number }) => {
+  const getNextFramePlacement = useCallback(() => {
+    const nextIndex = frames.length;
+    const column = nextIndex % 4;
+    const row = Math.floor(nextIndex / 4);
+
+    return {
+      x: 180 + column * 240,
+      y: 140 + row * 190,
+    };
+  }, [frames.length]);
+
+  const handleAddFrameAtPosition = useCallback(async (position: { x: number; y: number }) => {
+    if (isReadOnly) return;
     // Extract existing frame numbers and find the max to ensure unique incrementing titles
     const existingNumbers = frames
       .map(f => {
@@ -587,20 +651,47 @@ export function CanvasPage() {
       setSelectedFrames([newFrame.id]);
       success(`${newFrame.title} added to canvas`);
     }
-  }, [frames, createFrame, success]);
+  }, [frames, createFrame, success, isReadOnly]);
+
+  const handleCanvasBackgroundClick = useCallback(() => {
+    if (activeTool === "connector") {
+      if (connectingFromFrameId || selectedFrames.length > 0) {
+        setConnectingFromFrameId(null);
+        setSelectedFrames([]);
+        broadcastFrameSelect(null, userName, userColor);
+        info("🔗 Connection cancelled");
+      }
+      return;
+    }
+
+    if (selectedFrames.length > 0) {
+      setSelectedFrames([]);
+      broadcastFrameSelect(null, userName, userColor);
+    }
+  }, [
+    activeTool,
+    connectingFromFrameId,
+    selectedFrames.length,
+    broadcastFrameSelect,
+    userName,
+    userColor,
+    info,
+  ]);
 
   // Handle frame double-click to open sketch editor
   const handleFrameDoubleClick = useCallback((id: string) => {
+    if (isReadOnly) return;
     const frame = frames.find(f => f.id === id);
     if (frame) {
       // Open sketch editor instead of text editor
       setSketchEditorFrameId(id);
       setIsSketchEditorOpen(true);
     }
-  }, [frames]);
+  }, [frames, isReadOnly]);
 
   // Handle polishing a single frame (used by FrameCard quick polish and sketch editor)
   const handlePolishSingleFrame = useCallback(async (frameId: string) => {
+    if (isReadOnly) return;
     const frame = frames.find(f => f.id === frameId);
     if (!frame?.sketchDataUrl) return;
 
@@ -619,10 +710,11 @@ export function CanvasPage() {
       console.error("Polish failed:", error);
       notifyError(`Polish failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
-  }, [frames, saveFrameImage, success, notifyError, info]);
+  }, [frames, saveFrameImage, success, notifyError, info, isReadOnly]);
 
   // Batch polish ALL frames with sketches for storyboard consistency
   const handleBatchPolishAll = useCallback(async () => {
+    if (isReadOnly) return;
     // Find ALL frames that have sketches but aren't polished yet
     const framesToPolish = frames.filter(f => f.sketchDataUrl && f.status !== "polished");
 
@@ -671,7 +763,7 @@ export function CanvasPage() {
 
       success(`🎨 ${successCount}/${framesToPolish.length} frames polished!`);
     }
-  }, [frames, saveFrameImage, refreshBoard, info, success, notifyError]);
+  }, [frames, saveFrameImage, refreshBoard, info, success, notifyError, isReadOnly]);
 
   // Handle saving sketch from editor (with optional polish)
   // When isPolished=true, dataUrl contains the already-polished image from the preview
@@ -681,8 +773,10 @@ export function CanvasPage() {
     isPolished: boolean = false,
     motionNotes?: string,
     animationStyle?: AnimationStyle,
-    originalSketchData?: string
+    originalSketchData?: string,
+    polishStyle?: PolishStyle
   ) => {
+    if (isReadOnly) return;
     if (sketchEditorFrameId) {
       // If this is a polished save, save the original sketch FIRST
       if (isPolished && originalSketchData) {
@@ -703,13 +797,21 @@ export function CanvasPage() {
 
       success(isPolished ? "✨ Polished & Saved!" : "Sketch saved to frame");
 
+      if (boardId) {
+        if (isPolished && polishStyle) {
+          setFramePolishStyles(saveFramePolishStyle(boardId, sketchEditorFrameId, polishStyle));
+        } else {
+          setFramePolishStyles(clearFramePolishStyle(boardId, sketchEditorFrameId));
+        }
+      }
+
       // Refresh board data to update UI with new images
       await refreshBoard();
 
       setIsSketchEditorOpen(false);
       setSketchEditorFrameId(null);
     }
-  }, [sketchEditorFrameId, saveFrameImage, updateFrame, success, refreshBoard]);
+  }, [boardId, sketchEditorFrameId, saveFrameImage, updateFrame, success, refreshBoard, isReadOnly]);
 
   // Get frame for sketch editor
   const sketchEditorFrame = useMemo(() => {
@@ -722,11 +824,13 @@ export function CanvasPage() {
       sketchDataUrl: frame.sketchDataUrl,
       motionNotes: frame.motionNotes,
       animationStyle: frame.animationStyle,
+      polishStyle: frame.polishStyle,
     };
   }, [sketchEditorFrameId, frames]);
 
   // Save frame edits
   const handleSaveFrameEdit = useCallback(async () => {
+    if (isReadOnly) return;
     if (editingFrame) {
       await updateFrame(editingFrame.id, {
         title: editTitle,
@@ -734,7 +838,7 @@ export function CanvasPage() {
       setEditingFrame(null);
       success("Frame updated");
     }
-  }, [editingFrame, editTitle, updateFrame, success]);
+  }, [editingFrame, editTitle, updateFrame, success, isReadOnly]);
 
   // Load demo storyboard
   const handleLoadDemo = useCallback(async () => {
@@ -1161,7 +1265,7 @@ export function CanvasPage() {
       { key: "z", ctrl: true, shift: true, action: handleRedo },
       { key: "=", ctrl: true, action: handleZoomIn },
       { key: "-", ctrl: true, action: handleZoomOut },
-      { key: "n", ctrl: true, action: () => handleCanvasClick({ x: 200 + Math.random() * 400, y: 150 + Math.random() * 200 }) },
+      { key: "n", ctrl: true, action: () => handleAddFrameAtPosition(getNextFramePlacement()) },
       {
         key: "Delete",
         action: () => {
@@ -1175,7 +1279,7 @@ export function CanvasPage() {
         },
       },
     ],
-    [handleToolChange, handleUndo, handleRedo, handleZoomIn, handleZoomOut, selectedFrames, handleFrameDelete, handleCanvasClick]
+    [handleToolChange, handleUndo, handleRedo, handleZoomIn, handleZoomOut, selectedFrames, handleFrameDelete, handleAddFrameAtPosition, getNextFramePlacement]
   );
 
   useKeyboardShortcuts(shortcuts);
@@ -1226,7 +1330,7 @@ export function CanvasPage() {
                 <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                   <Lock className="w-8 h-8 text-red-400" />
                 </div>
-                <h1 className="text-xl font-semibold text-white mb-2">Access Denied</h1>
+                <h1 data-testid="board-state-access-denied" className="text-xl font-semibold text-white mb-2">Access Denied</h1>
                 <p className="text-white/60 mb-6">
                   You don't have permission to view this board. Ask the owner to invite you.
                 </p>
@@ -1242,7 +1346,7 @@ export function CanvasPage() {
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
                   <FileQuestion className="w-8 h-8 text-amber-400" />
                 </div>
-                <h1 className="text-xl font-semibold text-white mb-2">Board Not Found</h1>
+                <h1 data-testid="board-state-not-found" className="text-xl font-semibold text-white mb-2">Board Not Found</h1>
                 <p className="text-white/60 mb-6">
                   This board doesn't exist or has been deleted.
                 </p>
@@ -1258,7 +1362,7 @@ export function CanvasPage() {
                 <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                   <AlertCircle className="w-8 h-8 text-red-400" />
                 </div>
-                <h1 className="text-xl font-semibold text-white mb-2">Failed to Load</h1>
+                <h1 data-testid="board-state-load-failed" className="text-xl font-semibold text-white mb-2">Failed to Load</h1>
                 <p className="text-white/60 mb-6">
                   Something went wrong loading this board. Please try again.
                 </p>
@@ -1293,7 +1397,7 @@ export function CanvasPage() {
             <div className="w-16 h-16 rounded-2xl bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
               <FileQuestion className="w-8 h-8 text-amber-400" />
             </div>
-            <h1 className="text-xl font-semibold text-white mb-2">Board Not Found</h1>
+            <h1 data-testid="board-state-empty" className="text-xl font-semibold text-white mb-2">Board Not Found</h1>
             <p className="text-white/60 mb-6">
               This board doesn't exist or the URL is incorrect.
             </p>
@@ -1379,6 +1483,28 @@ export function CanvasPage() {
         </GlassCard>
       </header>
 
+      {isReadOnly && (
+        <div
+          data-testid="canvas-read-only-banner"
+          className="fixed top-16 left-1/2 z-50 -translate-x-1/2 px-4 py-2 rounded-lg border border-amber-500/40 bg-amber-500/15 text-amber-100 text-sm font-medium"
+          role="status"
+        >
+          View only — editing is disabled on this link
+        </div>
+      )}
+
+      {!isReadOnly && activeTool === "connector" && (
+        <div
+          data-testid="canvas-connect-status"
+          className="fixed top-16 left-1/2 z-50 -translate-x-1/2 mt-12 rounded-full border border-cyan-400/25 bg-[#111217]/88 px-4 py-2 text-xs font-medium tracking-[0.08em] text-cyan-100 shadow-lg backdrop-blur-md"
+          role="status"
+        >
+          {connectingFromFrameId
+            ? "Connect mode: choose a target frame, or click empty canvas to cancel."
+            : "Connect mode: choose the source frame to start a link."}
+        </div>
+      )}
+
       {/* Left Toolbar */}
       <CanvasToolbar
         activeTool={activeTool}
@@ -1389,10 +1515,7 @@ export function CanvasPage() {
         onUndo={handleUndo}
         onRedo={handleRedo}
         frameCount={frames.length}
-        onAddFrame={() => handleCanvasClick({ 
-          x: 150 + Math.random() * 400, 
-          y: 120 + Math.random() * 200 
-        })}
+        onAddFrame={() => handleAddFrameAtPosition(getNextFramePlacement())}
         onAutoArrange={handleAutoArrange}
         onPreview={handlePreview}
         onBatchPolish={handleBatchPolishAll}
@@ -1403,6 +1526,7 @@ export function CanvasPage() {
         isMotionSuggesting={isMotionSuggesting}
         isContinuityChecking={isContinuityChecking}
         polishedFrameCount={polishedFrameCount}
+        readOnly={isReadOnly}
       />
 
       {/* Remote Cursors Layer */}
@@ -1417,7 +1541,7 @@ export function CanvasPage() {
           onFrameSelect={handleFrameSelect}
           onFrameDelete={handleFrameDelete}
           onFrameDuplicate={handleFrameDuplicate}
-          onCanvasClick={handleCanvasClick}
+          onCanvasBackgroundClick={handleCanvasBackgroundClick}
           onFrameDoubleClick={handleFrameDoubleClick}
           onConnectionDelete={handleConnectionDelete}
           onFramePositionChange={handleFramePositionChange}
@@ -1428,6 +1552,7 @@ export function CanvasPage() {
           connectingFromFrameId={connectingFromFrameId}
           beatModeEnabled={beatModeEnabled}
           onFrameDurationChange={handleFrameDurationChange}
+          readOnly={isReadOnly}
         />
 
         {/* Empty State Hint */}
@@ -1444,14 +1569,14 @@ export function CanvasPage() {
                   <MousePointer className="w-8 h-8 text-white/60" />
                 </div>
                 <h3 className="font-display font-bold text-xl text-white mb-2">
-                  Click anywhere to add your first frame
+                  Add your first frame to start the board
                 </h3>
                 <p className="text-white/60 mb-4">
-                  Or load a demo storyboard to see the full workflow in action
+                  Use the Add Frame control or load a demo storyboard to see the full workflow in action
                 </p>
                 <div className="flex gap-3 justify-center">
                   <Button
-                    onClick={() => handleCanvasClick({ x: 200, y: 150 })}
+                    onClick={() => handleAddFrameAtPosition({ x: 200, y: 150 })}
                     className="bg-sm-magenta hover:bg-sm-magenta/90 text-white"
                   >
                     <Plus className="w-4 h-4 mr-2" />
