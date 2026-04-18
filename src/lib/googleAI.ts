@@ -1,4 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
+import { supabase } from "./supabase";
+import { POLISH_STYLES } from "./polishStyles";
+import {
+  normalizeMediaError,
+  shouldRetryMediaError,
+  waitForRetry,
+} from "./mediaErrors";
 
 // Legacy Google/Gemini client path.
 // Verified against current Google model listings in April 2026:
@@ -6,6 +13,10 @@ import { GoogleGenAI } from "@google/genai";
 // - Text, analysis, and director outputs: gemini-2.5-flash
 const GOOGLE_IMAGE_MODEL = "gemini-2.5-flash-image";
 const GOOGLE_TEXT_MODEL = "gemini-2.5-flash";
+type PolishProvider = "replicate" | "google";
+const DEFAULT_POLISH_PROMPT =
+  POLISH_STYLES.find((style) => style.id === "illustration")?.prompt ||
+  "Transform this rough sketch into a polished digital illustration while keeping the same subject, composition, and framing.";
 
 const getAIClient = () => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -43,6 +54,85 @@ async function generateGeminiContent(
   }
 }
 
+function getConfiguredPolishProviders(): PolishProvider[] {
+  const primary = (import.meta.env.VITE_POLISH_PROVIDER_PRIMARY || "replicate").toLowerCase();
+  const fallback = (import.meta.env.VITE_POLISH_PROVIDER_FALLBACK || "google").toLowerCase();
+  const providers = [primary, fallback].filter(
+    (value): value is PolishProvider => value === "replicate" || value === "google",
+  );
+  const ordered = providers.length ? providers : (["replicate", "google"] as PolishProvider[]);
+
+  return Array.from(new Set<PolishProvider>(ordered));
+}
+
+async function invokeReplicatePolishFunction(
+  imageInput: string,
+  stylePrompt?: string,
+): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke("polish-sketch", {
+    body: {
+      imageInput,
+      stylePrompt: stylePrompt || "",
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || "Polish request failed");
+  }
+
+  if (!data) {
+    throw new Error("Polish request returned no data");
+  }
+
+  if (data.status === "error") {
+    throw new Error(data.error || "Polish request failed");
+  }
+
+  return data.imageBase64 || data.outputUrl || null;
+}
+
+function extractImageFromGeminiResponse(response: any): string | null {
+  const parts = response?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) {
+    return null;
+  }
+
+  for (const part of parts) {
+    if (part?.inlineData?.mimeType?.startsWith?.("image/") && part.inlineData.data) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+
+    if (part?.fileData?.fileUri) {
+      return String(part.fileData.fileUri);
+    }
+  }
+
+  return null;
+}
+
+function buildStructuredPolishPrompt(stylePrompt?: string): string {
+  const resolvedStylePrompt = stylePrompt?.trim() || DEFAULT_POLISH_PROMPT;
+
+  return `
+You are polishing a rough storyboard sketch into a finished image.
+
+STYLE BRIEF:
+${resolvedStylePrompt}
+
+GLOBAL RULES:
+- preserve the original subject, composition, framing, and overall scene intent
+- keep the same shot, camera angle, blocking, and silhouette unless the sketch already implies variation
+- improve finish, readability, detail, color, lighting, texture, and style execution
+- infer missing visual detail carefully without changing the scene concept
+- respect negative space and avoid crowding the frame with extra objects
+- if the sketch is sparse or rough, fill in missing detail conservatively and stay close to the original layout
+- do not invent a different shot, new characters, unrelated props, or a different background concept
+- do not return explanatory text, notes, captions, or markup
+
+Return image only.
+  `.trim();
+}
+
 /**
  * Convert image URL to base64 data URL
  */
@@ -64,34 +154,21 @@ async function imageUrlToBase64(url: string): Promise<string> {
   });
 }
 
-/**
- * Polish a rough sketch into a professional illustration using Gemini
- * Uses image generation capabilities with responseModalities: ["TEXT", "IMAGE"]
- */
-export async function polishSketch(imageInput: string): Promise<string | null> {
+async function invokeGooglePolishFunction(
+  imageInput: string,
+  stylePrompt: string,
+): Promise<string | null> {
   if (!ai) {
-    throw new Error("API key not configured. Add VITE_GEMINI_API_KEY to .env");
+    throw new Error("Google image polish is not configured.");
   }
 
-  // Convert URL to base64 if needed
   const base64Image = await imageUrlToBase64(imageInput);
-
   const response = await generateGeminiContent("Sketch polish", GOOGLE_IMAGE_MODEL, {
     contents: [
       {
         role: "user",
         parts: [
-          {
-            text: `Transform this rough sketch into a polished, professional digital illustration.
-
-REQUIREMENTS:
-- Keep the EXACT same composition, layout, and subject matter
-- Enhance lines to be clean and professional
-- Add rich colors, shading, and lighting
-- Make it look like a finished storyboard frame from a professional animator
-- Maintain the artistic intent
-- Output ONLY the enhanced image`,
-          },
+          { text: stylePrompt },
           {
             inlineData: {
               data: base64Image.replace(/^data:image\/\w+;base64,/, ""),
@@ -102,23 +179,78 @@ REQUIREMENTS:
       },
     ],
     config: {
-      responseModalities: ["TEXT", "IMAGE"],
+      responseModalities: ["IMAGE", "TEXT"],
     },
   });
 
-  // Extract image from response
-  const parts = response.candidates?.[0]?.content?.parts;
-  if (parts) {
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        const mimeType = part.inlineData.mimeType || "image/png";
-        return `data:${mimeType};base64,${part.inlineData.data}`;
+  const imageResult = extractImageFromGeminiResponse(response);
+  if (!imageResult) {
+    throw new Error("Google image polish returned no image.");
+  }
+
+  if (imageResult.startsWith("data:")) {
+    return imageResult;
+  }
+
+  return imageUrlToBase64(imageResult);
+}
+
+async function polishWithProvider(
+  provider: PolishProvider,
+  imageInput: string,
+  stylePrompt: string,
+) {
+  if (provider === "replicate") {
+    return invokeReplicatePolishFunction(imageInput, stylePrompt);
+  }
+
+  return invokeGooglePolishFunction(imageInput, stylePrompt);
+}
+
+async function runPolishRouter(imageInput: string, stylePrompt?: string): Promise<string | null> {
+  if (!imageInput?.trim()) {
+    throw new Error("An image is required before starting polish.");
+  }
+
+  const structuredPrompt = buildStructuredPolishPrompt(stylePrompt);
+  const providers = getConfiguredPolishProviders();
+  let lastErrorMessage = "Image polish is temporarily unavailable. Your original sketch is safe.";
+
+  for (let providerIndex = 0; providerIndex < providers.length; providerIndex += 1) {
+    const provider = providers[providerIndex];
+    const maxAttempts = providerIndex === 0 ? 3 : 1;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        return await polishWithProvider(provider, imageInput, structuredPrompt);
+      } catch (error) {
+        const normalized = normalizeMediaError(error, {
+          provider,
+          fallbackMessage: "Image polish is temporarily unavailable. Your original sketch is safe.",
+        });
+        lastErrorMessage = normalized.userMessage;
+
+        console.warn(`[Polish] ${provider} attempt ${attempt + 1} failed`, normalized);
+
+        if (attempt < maxAttempts - 1 && shouldRetryMediaError(normalized)) {
+          await waitForRetry(attempt, 350, 1400);
+          continue;
+        }
+
+        break;
       }
     }
   }
 
-  console.warn("No image in Gemini response");
-  return null;
+  throw new Error(lastErrorMessage);
+}
+
+/**
+ * Polish a rough sketch into a professional illustration using Gemini
+ * Uses image generation capabilities with responseModalities: ["TEXT", "IMAGE"]
+ */
+export async function polishSketch(imageInput: string): Promise<string | null> {
+  return runPolishRouter(imageInput, DEFAULT_POLISH_PROMPT);
 }
 
 /**
@@ -128,57 +260,7 @@ export async function polishSketchWithStyle(
   imageInput: string,
   stylePrompt: string
 ): Promise<string | null> {
-  if (!ai) {
-    throw new Error("API key not configured. Add VITE_GEMINI_API_KEY to .env");
-  }
-
-  // Convert URL to base64 if needed
-  const base64Image = await imageUrlToBase64(imageInput);
-
-  const fullPrompt = `Transform this rough sketch into a polished, professional image.
-
-STYLE: ${stylePrompt}
-
-REQUIREMENTS:
-- Keep the EXACT same composition, layout, and subject matter
-- Enhance lines to be clean and professional
-- Add rich colors, shading, and lighting appropriate to the style
-- Maintain the original artistic intent
-- Output ONLY the enhanced image, no text`;
-
-  const response = await generateGeminiContent(
-    "Styled sketch polish",
-    GOOGLE_IMAGE_MODEL,
-    {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: fullPrompt },
-          {
-            inlineData: {
-              data: base64Image.replace(/^data:image\/\w+;base64,/, ""),
-              mimeType: "image/png",
-            },
-          },
-        ],
-      },
-    ],
-    config: {
-      responseModalities: ["TEXT", "IMAGE"],
-    },
-    },
-  );
-
-  const parts = response.candidates?.[0]?.content?.parts;
-  if (parts) {
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        return `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
-      }
-    }
-  }
-  return null;
+  return runPolishRouter(imageInput, stylePrompt);
 }
 
 /**
