@@ -36,3 +36,11 @@ core
 .env
 
 .vercel
+
+# TestSprite transient artifacts
+testsprite_tests/tmp/
+testsprite_tests/**/__pycache__/
+testsprite_tests/**/*.pyc
+
+# Supabase local CLI metadata
+supabase/.temp/

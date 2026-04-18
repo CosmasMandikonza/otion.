@@ -1,105 +1,314 @@
-# SketchMotion
+# 🎬 SketchMotion
 
-SketchMotion is a collaborative storyboard workspace for turning rough visual frames into a motion-ready plan. Teams can sketch scenes, organize boards, persist frames in Supabase, collaborate in real time, and now run a judged GLM-powered storyboard workflow that analyzes saved frames, proposes shots, surfaces continuity rules, and supports one-click revision passes.
+**SketchMotion is a storyboard-to-motion workspace for creative teams — built to turn rough frames into polished visuals, style-aware motion tests, and export-ready handoff in one place.**
 
-## Product Description
+🚀 **Live App:** https://sketch-motion-main.vercel.app  
+🎥 **Demo Video:** https://www.youtube.com/watch?v=7nRd42cjbdw
 
-SketchMotion helps creative teams move from storyboard frames to a production plan without leaving the canvas.
+---
 
-- Create and organize storyboard boards and frames
-- Save sketches and polished frames to Supabase storage
-- Collaborate on the same board with realtime presence and interaction cues
-- Use AI helpers for sketch polish, prompt generation, and storyboard planning
-- Run a staged GLM workflow inside the existing AI panel without changing the core editing experience
+## ✨ What SketchMotion Is
 
-## Target User
+SketchMotion helps creative teams move from **rough storyboard ideas** to **review-ready visuals and motion** without breaking the workflow across disconnected tools.
 
-SketchMotion is designed for:
+Instead of bouncing between:
+- whiteboards
+- docs
+- image generators
+- prompt notes
+- review threads
+- export tools
 
-- Creative directors shaping a storyboard before production
-- Motion designers planning shots, pacing, and continuity
-- Founders and marketers turning campaign ideas into a clear visual sequence
-- Small creative teams who need a shared storyboard workspace, not a full editing suite
+SketchMotion keeps the **board at the center** of the process.
 
-## What Works Today
+You can:
+- sketch directly in frames
+- polish rough visuals with AI
+- run storyboard-aware planning
+- revise the plan without restarting
+- generate style-aware motion
+- share boards in read-only mode
+- export from a stable finishing surface
 
-- Supabase auth and board persistence
-- Frame CRUD, ordering, and storage-backed image assets
-- Realtime collaboration and presence flows
-- Existing Google/Gemini-powered sketch and prompt helpers
-- Existing Google-backed video-generation path through Supabase edge functions
-- New Z.AI / GLM storyboard planning workflow in the AI panel when `VITE_AI_PROVIDER=zai`
+---
 
-## Architecture
+## 🧩 The Problem
+
+Most creative AI tools are good at generating something once.
+
+They are much worse at supporting the **actual workflow** around that output:
+- preserving sequence and framing
+- keeping revisions attached to the board
+- handling missing inputs cleanly
+- surviving provider failures
+- supporting review and export like real software
+
+That creates a common failure mode:
+
+> teams end up with visuals, but not a dependable storyboard operating surface.
+
+SketchMotion was built to solve that.
+
+---
+
+## 💡 Why SketchMotion Matters
+
+Storyboards are not just pictures.
+
+They carry:
+- direction
+- framing
+- continuity
+- timing
+- collaboration context
+- review intent
+
+The useful product is not:
+> “generate a cool frame”
+
+The useful product is:
+- keep the board organized
+- preserve intent
+- plan the next pass
+- revise without resetting
+- hand off work cleanly
+- stay usable when AI workflows hit edge cases
+
+---
+
+## 🛠️ What SketchMotion Does
+
+SketchMotion gives creative teams one place to:
+
+✅ manage boards  
+✅ sketch frames directly on canvas  
+✅ polish rough sketches into cleaner visuals  
+✅ run storyboard-aware planning  
+✅ add revision guidance and rerun planning  
+✅ generate style-aware video from board imagery  
+✅ share boards publicly in read-only mode  
+✅ review outputs through a dedicated export flow  
+
+---
+
+## 🔄 Core Workflow
+
+### 1. 📝 Build the board
+Create a board and organize frames on the canvas.
+
+### 2. ✏️ Sketch directly in-frame
+Draw rough ideas inside the frame editor.
+
+### 3. 🎨 AI polish
+Turn rough sketches into cleaner visuals while preserving the scene and composition.
+
+### 4. 🧠 Plan the next pass
+Run the planning workflow to generate:
+- storyboard analysis
+- shot plan
+- continuity guidance
+- render strategy
+
+### 5. 🔁 Revise and rerun
+Add targeted revision input and update the plan without throwing away prior work.
+
+### 6. 🎥 Generate motion
+Create style-aware video in different output formats like landscape or vertical.
+
+### 7. 🌍 Share and export
+Open boards in public read-only mode and use export as the finishing surface.
+
+---
+
+## 🌟 Why SketchMotion Is Different
+
+SketchMotion is **not** a generic AI prompt box wrapped in pretty UI.
+
+### 🎞️ Storyboard-first
+The board is the source of truth. Frames, sequence, continuity, and revision all stay attached to it.
+
+### 🧭 Planning is visible
+The planning workflow produces readable analysis, shot structure, continuity rules, and render strategy inside the product.
+
+### 🔁 Revision is part of the system
+You can revise and rerun instead of restarting from zero every time feedback lands.
+
+### 🎬 Motion is tied to board state
+Video generation inherits real board context, including frame readiness and style direction.
+
+### 🧱 It behaves like a real workspace
+Auth, persistence, sharing, export, guardrails, and failure handling are part of the actual product.
+
+---
+
+## 🖥️ Product Surfaces
+
+- **Dashboard** — board management and saved work
+- **Canvas** — arrange, sketch, connect, and edit frames
+- **Planning Workflow** — analysis, shot plan, continuity, revision
+- **Share Flow** — public read-only board access
+- **Export Page** — output review and finishing surface
+
+---
+
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-  User["Creator in browser"] --> App["SketchMotion React + Vite app"]
-  App --> Auth["Supabase Auth"]
-  App --> DB["Supabase Postgres"]
-  App --> Storage["Supabase Storage"]
-  App --> RT["Supabase Realtime / Presence"]
-  App --> GoogleUI["Google/Gemini client helpers"]
-  App --> Storyboard["storyboard-plan edge function"]
-  App --> Video["generate-video + check-video-status edge functions"]
-  Storyboard --> Planning["Z.AI coding endpoint\nglm-5.1"]
-  Video --> Vertex["Google video backend"]
+  User["🎨 Creative Team"] --> App["🖥️ SketchMotion Web App<br/>React + TypeScript + Vite"]
+
+  App --> Auth["🔐 Supabase Auth"]
+  App --> DB["🗄️ Supabase Postgres"]
+  App --> Storage["📦 Supabase Storage"]
+  App --> Realtime["⚡ Supabase Realtime / Presence"]
+  App --> Edge["🧩 Supabase Edge Functions"]
+
+  Edge --> Plan["🧠 storyboard-plan"]
+  Edge --> Polish["🎨 polish-sketch"]
+  Edge --> VideoStart["🎥 generate-video"]
+  Edge --> VideoPoll["🔄 check-video-status"]
+
+  Plan --> GLM["🤖 Z.AI coding endpoint<br/>glm-5.1"]
+  Polish --> ReplicatePolish["🖼️ Replicate<br/>FLUX Kontext Pro"]
+  VideoStart --> ReplicateVideo["🎞️ Replicate<br/>Seedance 2.0 Fast"]
+  VideoPoll --> ReplicateVideo
+
+  Here’s a more alive, polished README version with emojis, stronger framing, your **live app link**, your **demo video link**, and a cleaner architecture section.
+
+
+## ⚙️ Tech Stack
+
+### Frontend
+
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* Framer Motion
+* Radix primitives
+
+### Backend Platform
+
+* Supabase Auth
+* Supabase Postgres
+* Supabase Storage
+* Supabase Realtime / Presence
+* Supabase Edge Functions
+
+### AI / Media
+
+* **Planning:** GLM 5.1 through Z.AI coding endpoint
+* **Image polish:** Replicate / FLUX Kontext Pro
+* **Video generation:** Replicate / Seedance 2.0 Fast
+* **Prompt strategy:** deterministic local prompt builder with extensible provider routing
+
+### Testing
+
+* TestSprite-generated Playwright flows
+* two-round product hardening approach
+* core workflow coverage + edge/failure handling
+
+---
+
+## 🧪 Tested With TestSprite
+
+This submission was strengthened through **real TestSprite-driven iteration**, not just cosmetic testing.
+
+### Round 1
+
+Core user journeys:
+
+* landing page
+* auth
+* protected dashboard
+* board creation/opening
+* frame editing
+* AI polish
+* video entry points
+* public board access
+* export basics
+
+### Round 2
+
+Edge and failure handling:
+
+* provider failure states
+* missing image / missing metadata guards
+* export empty state
+* invalid board state
+* persistence after refresh
+* GLM insufficient-input safeguards
+* read-only non-mutating behavior
+
+### What testing improved
+
+TestSprite helped harden:
+
+* polish trigger accessibility
+* share/copy stability
+* provider failure UX
+* video readiness guards
+* export empty-state handling
+* insufficient-input planning guards
+* canvas drag / pan / connect behavior
+
+📁 See: `testsprite_tests/`
+📝 See also: `testsprite_tests/BUG_FIX_LOG.md`
+📘 And: `testsprite_tests/TESTING_STRATEGY.md`
+
+---
+
+## 🚀 Live Demo
+
+### 🌐 Production
+
+[https://sketch-motion-main.vercel.app](https://sketch-motion-main.vercel.app)
+
+### 🎥 Demo Video
+
+[https://www.youtube.com/watch?v=7nRd42cjbdw](https://www.youtube.com/watch?v=7nRd42cjbdw)
+
+### Suggested demo path
+
+1. Sign in
+2. Open the dashboard
+3. Open a board
+4. Sketch in a frame
+5. Polish the frame
+6. Run planning
+7. Generate motion
+8. Show sharing
+9. Open export
+10. Show TestSprite artifacts
+
+---
+
+## 🧭 Running Locally
+
+### 1. Install dependencies
+
+```bash
+npm install
 ```
 
-### Runtime Notes
+### 2. Add local environment variables
 
-- The main product stays client-driven for board editing, collaboration, and the current Google/Gemini workflow.
-- The judged GLM path is server-side for secrets safety.
-- The judged GLM path is metadata-first and does not require live frame image fetches.
-- Google remains the default provider unless `VITE_AI_PROVIDER=zai` is set.
-
-## How We Use GLM 5.1
-
-The judged workflow is intentionally centered on one reliable model path:
-
-1. `glm-5.1` runs on the Z.AI coding endpoint and reads ordered frame titles, frame order, durations, motion notes, selected frame IDs, and Director Controls.
-2. That single coding-endpoint run produces the storyboard analysis, shot plan, continuity rules, render strategy, and revision-aware reasoning.
-3. The result is returned to the existing AI panel as readable sections instead of raw JSON by default.
-4. A follow-up revision can reuse the previous plan and ask `glm-5.1` for a tighter pass without changing the board structure.
-
-### Why This Matters
-
-- Secrets stay off the client.
-- The main demo path no longer depends on the general multimodal endpoint or separate image-fetch credits.
-- The workflow is easy to demo and easy to extend later for image or video orchestration if we want that after the hackathon.
-- The current Google/Gemini product path remains intact while the judged GLM path is feature-flagged.
-
-## Live Demo Path
-
-This is the narrow path we optimized for the submission demo:
-
-1. Start the app with `VITE_AI_PROVIDER=zai`.
-2. Make sure the `storyboard-plan` edge function is deployed with the Z.AI server secrets listed below.
-3. Sign in and open an existing board as the board owner.
-4. Open the AI panel and use the existing Director Controls if you want to steer mood, camera language, pacing, lighting, continuity, or avoid-list constraints.
-5. Click `Run Director Plan`.
-6. Review the returned `Storyboard Analysis`, `Shot Plan`, `Continuity Rules`, and `Render Strategy`.
-7. Enter one concise revision in `Revision Input`.
-8. Click `Apply Revision` to demonstrate the revision loop.
-
-## Setup
-
-### Client Environment
-
-Create a local `.env` file with:
+Create a `.env` file:
 
 ```bash
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_GEMINI_API_KEY=your_gemini_api_key
-VITE_AI_PROVIDER=google
+
+VITE_AI_PROVIDER=zai
+VITE_VIDEO_PROMPT_PROVIDER=local
+VITE_VIDEO_PROMPT_PROVIDER_FALLBACK=gemini
+VITE_POLISH_PROVIDER_PRIMARY=replicate
+VITE_POLISH_PROVIDER_FALLBACK=google
 ```
 
-Use `VITE_AI_PROVIDER=zai` when you want the new judged GLM workflow enabled in the UI.
+### 3. Add required server-side secrets
 
-### Server Environment For `storyboard-plan`
-
-Configure these as Supabase edge-function secrets:
+Set these in Supabase Edge Function secrets:
 
 ```bash
 STORYBOARD_AI_PROVIDER=zai
@@ -107,65 +316,62 @@ ZAI_API_KEY=your_zai_api_key
 ZAI_CODING_API_BASE_URL=https://api.z.ai/api/coding/paas/v4
 ZAI_GLM_PLANNING_MODEL=glm-5.1
 ZAI_THINKING_TYPE=enabled
+
+REPLICATE_API_TOKEN=your_replicate_token
+REPLICATE_POLISH_MODEL=black-forest-labs/flux-kontext-pro
+REPLICATE_VIDEO_MODEL=bytedance/seedance-2.0-fast
+VIDEO_PROVIDER_PRIMARY=replicate
+VIDEO_PROVIDER_FALLBACK=google
 ```
 
-Optional legacy / experimental env vars are still supported for older experiments, but they are not the judged path:
+### 4. Deploy edge functions
+
+Deploy:
+
+* `storyboard-plan`
+* `polish-sketch`
+* `generate-video`
+* `check-video-status`
+
+### 5. Run the app
 
 ```bash
-ZAI_GENERAL_API_BASE_URL=https://api.z.ai/api/paas/v4
-ZAI_GLM_VISION_MODEL=GLM-5V-Turbo
-ZAI_API_BASE_URL=https://api.z.ai/api/paas/v4
-ZAI_GLM_STORYBOARD_MODEL=glm-4.6v
-```
-
-### Server Environment For Video Generation
-
-The current video-generation edge functions expect Google-side server configuration:
-
-```bash
-GOOGLE_CLOUD_PROJECT=your_project_id
-GOOGLE_CLOUD_LOCATION=us-central1
-GOOGLE_CLOUD_BUCKET_NAME=your_bucket_if_used
-GOOGLE_SERVICE_ACCOUNT_KEY=your_service_account_json_or_base64
-```
-
-### Run Locally
-
-```bash
-npm install
 npm run dev
 ```
 
-If you use Supabase locally or in a hosted project, deploy the relevant edge functions before testing the full AI flow.
+For stable preview:
 
-## Judged Workflow Output
+```bash
+npx tsc --noEmit
+npx vite build
+npx vite preview --port 5173
+```
 
-The GLM workflow returns structured data with:
+---
 
-- Frame-by-frame analysis
-- Scene and shot planning
-- Continuity constraints
-- Render strategy guidance
-- Revision context for the next pass
-- Model and endpoint metadata for transparent reporting
+## 📌 Known Limitations
 
-## Known Limitations
+* planning quality improves when storyboard metadata is stronger
+* motion generation is currently a board-driven downstream step, not full multi-shot orchestration
+* some optional legacy provider paths remain configurable, but the current reliable path uses the migrated planning and media stack
+* the checked-in frontend suite is strong for product behavior, but not a substitute for broader load or model-quality benchmarking
 
-- The judged GLM workflow is metadata-first. It does not require remote image URLs, but richer frame notes still improve output quality.
-- Google remains the default provider. Changing to `VITE_AI_PROVIDER=zai` requires restarting the app.
-- The GLM path currently plans and revises the storyboard; it does not yet trigger final video generation automatically.
-- The current video generation path is still separate from the judged GLM workflow and uses the existing Google-backed video functions.
-- The current video path anchors generation from a single frame image rather than a full multi-frame render plan.
-- The Kestra director block is still demo-oriented and depends on stored external results.
-- Some legacy setup details, such as older schema history and certain demo-oriented tables, are not fully represented in the checked-in migrations.
+---
 
-## Submission Notes
+## 🏁 Why This Submission Is Strong
 
-SketchMotion is strongest when it is shown as a collaborative storyboard workspace with a visible, believable GLM planning loop:
+SketchMotion stands out because it behaves like a real product:
 
-- Open a real board
-- Run the GLM storyboard workflow
-- Show the structured plan
-- Apply one revision
+* ✅ real auth and persistence
+* ✅ real storyboard canvas workflow
+* ✅ planning integrated into the working UI
+* ✅ image polish and motion generation
+* ✅ share and export surfaces
+* ✅ visible handling for failure states
+* ✅ genuine TestSprite usage with product improvements
 
-That is the clearest representation of the product today and the safest path for a live demo.
+This is not a one-click toy demo.
+
+It is a storyboard-first creative workflow that was built, tested, and hardened like real software.
+
+
